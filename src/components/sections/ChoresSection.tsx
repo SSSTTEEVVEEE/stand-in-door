@@ -68,7 +68,9 @@ const ChoresSection = () => {
     const SAMPLE_SIZE = 20000;
 
     const computeSchedule = (offsets: Record<string, number>) => {
-      const schedule = Array(DAYS_TOTAL).fill(0).map(() => [] as string[]);
+      const schedule = Array(DAYS_TOTAL)
+        .fill(0)
+        .map(() => [] as string[]);
       chores.forEach(({ name, period }) => {
         const start = offsets[name];
         for (let day = start; day <= DAYS_TOTAL; day += period) {
@@ -79,7 +81,7 @@ const ChoresSection = () => {
     };
 
     const evaluateSchedule = (schedule: string[][]) => {
-      const counts = schedule.map(d => d.length);
+      const counts = schedule.map((d) => d.length);
       const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
       const variance = counts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / counts.length;
       return { mean, variance };
@@ -99,21 +101,21 @@ const ChoresSection = () => {
       const offsets = generateOffsets();
       const schedule = computeSchedule(offsets);
       const { mean, variance } = evaluateSchedule(schedule);
-      
+
       best.push({ offsets, schedule, mean, variance });
       best.sort((a, b) => a.variance - b.variance);
       if (best.length > 5) best.pop();
 
       if (trial % 100 === 0) {
         setProgress((trial / SAMPLE_SIZE) * 100);
-        await new Promise(r => setTimeout(r, 1));
+        await new Promise((r) => setTimeout(r, 1));
       }
     }
 
     setResults(best[0]);
     setIsOptimizing(false);
     setProgress(100);
-    
+
     toast({
       title: "Optimization Complete",
       description: `Variance: ${best[0].variance.toFixed(3)} | Mean: ${best[0].mean.toFixed(2)}`,
@@ -123,19 +125,14 @@ const ChoresSection = () => {
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <h2 className="text-2xl font-bold mb-4">CHORE CONFIGURATION</h2>
-        
+        <h2 className="text-2xl font-bold mb-4">TASK CONFIGURATION</h2>
+
         <div className="space-y-4 mb-6">
           {chores.map((chore, index) => (
             <div key={index} className="flex items-center gap-4 p-3 bg-muted/50 rounded">
               <span className="font-bold min-w-[100px]">{chore.name}</span>
               <span className="text-muted-foreground">Period: {chore.period} days</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => removeChore(index)}
-                className="ml-auto"
-              >
+              <Button variant="destructive" size="sm" onClick={() => removeChore(index)} className="ml-auto">
                 REMOVE
               </Button>
             </div>
@@ -174,7 +171,7 @@ const ChoresSection = () => {
 
       <Card className="p-6">
         <h2 className="text-2xl font-bold mb-4">OPTIMIZATION</h2>
-        
+
         <Button
           onClick={runOptimization}
           disabled={isOptimizing || chores.length === 0}
@@ -187,9 +184,7 @@ const ChoresSection = () => {
         {isOptimizing && (
           <div className="space-y-2">
             <Progress value={progress} className="h-2" />
-            <p className="text-sm text-muted-foreground text-center">
-              {progress.toFixed(0)}% complete
-            </p>
+            <p className="text-sm text-muted-foreground text-center">{progress.toFixed(0)}% complete</p>
           </div>
         )}
 
