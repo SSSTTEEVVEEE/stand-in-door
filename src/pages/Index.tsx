@@ -1,12 +1,116 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ChoresSection from "@/components/sections/ChoresSection";
+import ChecklistsSection from "@/components/sections/ChecklistsSection";
+import CalendarSection from "@/components/sections/CalendarSection";
 
 const Index = () => {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="text-center space-y-6 max-w-2xl">
+          <div className="space-y-2">
+            <h1 className="text-7xl md:text-9xl font-bold tracking-tighter">
+              STAND
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base tracking-widest uppercase">
+              in the door
+            </p>
+          </div>
+          
+          <p className="text-foreground/80 text-lg max-w-xl mx-auto leading-relaxed">
+            Military-grade task optimization. Zero-knowledge encryption. 
+            Complete operational control.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
+            <Button 
+              size="lg" 
+              className="font-bold tracking-wide"
+              onClick={() => setIsAuthenticated(true)}
+            >
+              DEPLOY
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="font-bold tracking-wide"
+            >
+              SECURE LOGIN
+            </Button>
+          </div>
+
+          <div className="pt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <Card className="p-6 border-border bg-card">
+              <h3 className="font-bold text-xl mb-2">CHORES</h3>
+              <p className="text-sm text-muted-foreground">
+                AI-optimized task scheduling using Monte Carlo simulation 
+                to minimize workload variance across 228-day cycles.
+              </p>
+            </Card>
+            <Card className="p-6 border-border bg-card">
+              <h3 className="font-bold text-xl mb-2">CHECKLISTS</h3>
+              <p className="text-sm text-muted-foreground">
+                Tactical reminder systems with grouped operations 
+                for mission-critical task execution.
+              </p>
+            </Card>
+            <Card className="p-6 border-border bg-card">
+              <h3 className="font-bold text-xl mb-2">CALENDAR</h3>
+              <p className="text-sm text-muted-foreground">
+                Zero-knowledge encrypted scheduling with seamless 
+                integration across all operational modules.
+              </p>
+            </Card>
+          </div>
+
+          <div className="pt-8 text-xs text-muted-foreground space-y-1">
+            <p>🔒 PBKDF2 / Argon2id → AES-256-GCM encryption</p>
+            <p>🔐 Local key storage • Zero server-side knowledge</p>
+            <p>🛡️ Privacy-preserving pseudonymization</p>
+          </div>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-4 md:p-8">
+      <header className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl md:text-6xl font-bold">STAND</h1>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">
+            in the door
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="font-bold">
+          LOGOUT
+        </Button>
+      </header>
+
+      <Tabs defaultValue="chores" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-3 mb-8">
+          <TabsTrigger value="chores" className="font-bold">CHORES</TabsTrigger>
+          <TabsTrigger value="checklists" className="font-bold">CHECKLISTS</TabsTrigger>
+          <TabsTrigger value="calendar" className="font-bold">CALENDAR</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="chores">
+          <ChoresSection />
+        </TabsContent>
+
+        <TabsContent value="checklists">
+          <ChecklistsSection />
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <CalendarSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
