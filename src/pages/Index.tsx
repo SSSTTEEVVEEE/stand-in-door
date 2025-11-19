@@ -36,7 +36,7 @@ const Index = () => {
               <h3 className="font-bold text-xl mb-2">Tasks</h3>
               <p className="text-sm text-muted-foreground">
                 ML-optimized task scheduling using Monte Carlo simulation to minimize workload variance in day to day
-                tasks. cycles.
+                tasks.
               </p>
             </Card>
             <Card className="p-6 border-border bg-card">
