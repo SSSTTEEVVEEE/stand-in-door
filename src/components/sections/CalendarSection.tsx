@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CalendarEvent {
   id: string;
@@ -22,8 +23,52 @@ const CalendarSection = () => {
     time: "",
     description: "",
   });
+  const [loading, setLoading] = useState(true);
+  const [pseudonymId, setPseudonymId] = useState<string>("");
 
-  const addEvent = () => {
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("pseudonym_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile) {
+        setPseudonymId(profile.pseudonym_id);
+
+        const { data: eventsData } = await supabase
+          .from("calendar_events")
+          .select("*")
+          .eq("pseudonym_id", profile.pseudonym_id);
+
+        if (eventsData) {
+          setEvents(eventsData.map(e => ({
+            id: e.id,
+            title: e.encrypted_title,
+            date: e.encrypted_date,
+            time: e.encrypted_time,
+            description: e.encrypted_description || ""
+          })).sort((a, b) => 
+            new Date(a.date + " " + a.time).getTime() - new Date(b.date + " " + b.time).getTime()
+          ));
+        }
+      }
+    } catch (error) {
+      console.error("Error loading events:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addEvent = async () => {
     if (!newEvent.title || !newEvent.date || !newEvent.time) {
       toast({
         title: "Invalid Input",
@@ -33,30 +78,73 @@ const CalendarSection = () => {
       return;
     }
 
-    const event: CalendarEvent = {
-      id: Date.now().toString(),
-      ...newEvent,
-    };
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("calendar_events")
+        .insert({
+          pseudonym_id: pseudonymId,
+          encrypted_title: newEvent.title,
+          encrypted_date: newEvent.date,
+          encrypted_time: newEvent.time,
+          encrypted_description: newEvent.description,
+          encrypted_created_at: now,
+        })
+        .select()
+        .single();
 
-    setEvents([...events, event].sort((a, b) => 
-      new Date(a.date + " " + a.time).getTime() - new Date(b.date + " " + b.time).getTime()
-    ));
+      if (error) throw error;
 
-    setNewEvent({ title: "", date: "", time: "", description: "" });
-    
-    toast({
-      title: "Event Scheduled",
-      description: `${event.title} added to calendar`,
-    });
+      const event: CalendarEvent = {
+        id: data.id,
+        ...newEvent,
+      };
+
+      setEvents([...events, event].sort((a, b) => 
+        new Date(a.date + " " + a.time).getTime() - new Date(b.date + " " + b.time).getTime()
+      ));
+
+      setNewEvent({ title: "", date: "", time: "", description: "" });
+      
+      toast({
+        title: "Event Scheduled",
+        description: `${event.title} added to calendar`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const deleteEvent = (id: string) => {
-    setEvents(events.filter(e => e.id !== id));
-    toast({
-      title: "Event Removed",
-      description: "Operation removed from calendar",
-    });
+  const deleteEvent = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("calendar_events")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setEvents(events.filter(e => e.id !== id));
+      toast({
+        title: "Event Removed",
+        description: "Operation removed from calendar",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return <div className="text-center p-8">Loading...</div>;
+  }
 
   const today = new Date().toISOString().split('T')[0];
   const upcomingEvents = events.filter(e => e.date >= today);
