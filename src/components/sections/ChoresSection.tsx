@@ -30,29 +30,26 @@ const ChoresSection = () => {
 
   const loadChores = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("pseudonym_id")
-        .eq("user_id", user.id)
-        .single();
+      const { data: profile } = await supabase.from("profiles").select("pseudonym_id").eq("user_id", user.id).single();
 
       if (profile) {
         setPseudonymId(profile.pseudonym_id);
 
-        const { data: choresData } = await supabase
-          .from("chores")
-          .select("*")
-          .eq("pseudonym_id", profile.pseudonym_id);
+        const { data: choresData } = await supabase.from("chores").select("*").eq("pseudonym_id", profile.pseudonym_id);
 
         if (choresData) {
-          setChores(choresData.map(c => ({
-            id: c.id,
-            name: c.encrypted_name,
-            period: parseInt(c.encrypted_period)
-          })));
+          setChores(
+            choresData.map((c) => ({
+              id: c.id,
+              name: c.encrypted_name,
+              period: parseInt(c.encrypted_period),
+            })),
+          );
         }
       }
     } catch (error) {
@@ -228,13 +225,13 @@ const ChoresSection = () => {
               type="number"
               value={newChorePeriod}
               onChange={(e) => setNewChorePeriod(e.target.value)}
-              placeholder="e.g., 7"
+              placeholder="task frequency (days)"
               className="font-mono"
             />
           </div>
           <div className="flex items-end">
             <Button onClick={addChore} className="w-full font-bold">
-              ADD CHORE
+              ADD TASK
             </Button>
           </div>
         </div>
