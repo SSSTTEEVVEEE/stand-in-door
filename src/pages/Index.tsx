@@ -19,7 +19,7 @@ const Index = () => {
           </div>
 
           <p className="text-foreground/80 text-lg max-w-xl mx-auto leading-relaxed">
-            Military-grade task optimization. Zero-knowledge encryption. Complete operational control.
+            Robust task optimization. Zero-knowledge encryption. Complete operational control.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
