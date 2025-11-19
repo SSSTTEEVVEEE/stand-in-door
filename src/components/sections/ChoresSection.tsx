@@ -1,32 +1,68 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Chore {
+  id?: string;
   name: string;
   period: number;
 }
 
 const ChoresSection = () => {
   const { toast } = useToast();
-  const [chores, setChores] = useState<Chore[]>([
-    { name: "S", period: 16 },
-    { name: "USC", period: 32 },
-    { name: "C", period: 4 },
-    { name: "T", period: 28 },
-    { name: "BS", period: 16 },
-  ]);
+  const [chores, setChores] = useState<Chore[]>([]);
   const [newChoreName, setNewChoreName] = useState("");
   const [newChorePeriod, setNewChorePeriod] = useState("");
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [pseudonymId, setPseudonymId] = useState<string>("");
 
-  const addChore = () => {
+  useEffect(() => {
+    loadChores();
+  }, []);
+
+  const loadChores = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("pseudonym_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile) {
+        setPseudonymId(profile.pseudonym_id);
+
+        const { data: choresData } = await supabase
+          .from("chores")
+          .select("*")
+          .eq("pseudonym_id", profile.pseudonym_id);
+
+        if (choresData) {
+          setChores(choresData.map(c => ({
+            id: c.id,
+            name: c.encrypted_name,
+            period: parseInt(c.encrypted_period)
+          })));
+        }
+      }
+    } catch (error) {
+      console.error("Error loading chores:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addChore = async () => {
     if (!newChoreName || !newChorePeriod) {
       toast({
         title: "Invalid Input",
@@ -46,16 +82,47 @@ const ChoresSection = () => {
       return;
     }
 
-    setChores([...chores, { name: newChoreName, period }]);
-    setNewChoreName("");
-    setNewChorePeriod("");
-    toast({
-      title: "Chore Added",
-      description: `${newChoreName} added to optimization queue`,
-    });
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("chores")
+        .insert({
+          pseudonym_id: pseudonymId,
+          encrypted_name: newChoreName,
+          encrypted_period: period.toString(),
+          encrypted_created_at: now,
+          encrypted_updated_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setChores([...chores, { id: data.id, name: newChoreName, period }]);
+      setNewChoreName("");
+      setNewChorePeriod("");
+      toast({
+        title: "Chore Added",
+        description: `${newChoreName} added to optimization queue`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const removeChore = (index: number) => {
+  const removeChore = async (index: number) => {
+    const chore = chores[index];
+    if (chore.id) {
+      try {
+        await supabase.from("chores").delete().eq("id", chore.id);
+      } catch (error) {
+        console.error("Error deleting chore:", error);
+      }
+    }
     setChores(chores.filter((_, i) => i !== index));
   };
 
@@ -121,6 +188,10 @@ const ChoresSection = () => {
       description: `Variance: ${best[0].variance.toFixed(3)} | Mean: ${best[0].mean.toFixed(2)}`,
     });
   };
+
+  if (loading) {
+    return <div className="text-center p-8">Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">

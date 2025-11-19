@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Reminder {
   id: string;
@@ -24,8 +25,52 @@ const ChecklistsSection = () => {
   const [newChecklistName, setNewChecklistName] = useState("");
   const [newReminderText, setNewReminderText] = useState("");
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pseudonymId, setPseudonymId] = useState<string>("");
 
-  const createChecklist = () => {
+  useEffect(() => {
+    loadChecklists();
+  }, []);
+
+  const loadChecklists = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("pseudonym_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile) {
+        setPseudonymId(profile.pseudonym_id);
+
+        const { data: checklistsData } = await supabase
+          .from("checklists")
+          .select("*, checklist_reminders(*)")
+          .eq("pseudonym_id", profile.pseudonym_id);
+
+        if (checklistsData) {
+          setChecklists(checklistsData.map(c => ({
+            id: c.id,
+            name: c.encrypted_name,
+            reminders: c.checklist_reminders.map((r: any) => ({
+              id: r.id,
+              text: r.encrypted_text,
+              completed: r.encrypted_completed === "true"
+            }))
+          })));
+        }
+      }
+    } catch (error) {
+      console.error("Error loading checklists:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createChecklist = async () => {
     if (!newChecklistName.trim()) {
       toast({
         title: "Invalid Input",
@@ -35,21 +80,42 @@ const ChecklistsSection = () => {
       return;
     }
 
-    const newChecklist: Checklist = {
-      id: Date.now().toString(),
-      name: newChecklistName,
-      reminders: [],
-    };
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("checklists")
+        .insert({
+          pseudonym_id: pseudonymId,
+          encrypted_name: newChecklistName,
+          encrypted_created_at: now,
+        })
+        .select()
+        .single();
 
-    setChecklists([...checklists, newChecklist]);
-    setNewChecklistName("");
-    toast({
-      title: "Checklist Created",
-      description: `${newChecklist.name} is ready for deployment`,
-    });
+      if (error) throw error;
+
+      const newChecklist: Checklist = {
+        id: data.id,
+        name: newChecklistName,
+        reminders: [],
+      };
+
+      setChecklists([...checklists, newChecklist]);
+      setNewChecklistName("");
+      toast({
+        title: "Checklist Created",
+        description: `${newChecklist.name} is ready for deployment`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const addReminder = (checklistId: string) => {
+  const addReminder = async (checklistId: string) => {
     if (!newReminderText.trim()) {
       toast({
         title: "Invalid Input",
@@ -59,53 +125,111 @@ const ChecklistsSection = () => {
       return;
     }
 
-    setChecklists(checklists.map(checklist => {
-      if (checklist.id === checklistId) {
-        return {
-          ...checklist,
-          reminders: [
-            ...checklist.reminders,
-            {
-              id: Date.now().toString(),
-              text: newReminderText,
-              completed: false,
-            }
-          ]
-        };
-      }
-      return checklist;
-    }));
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("checklist_reminders")
+        .insert({
+          checklist_id: checklistId,
+          encrypted_text: newReminderText,
+          encrypted_completed: "false",
+          encrypted_created_at: now,
+        })
+        .select()
+        .single();
 
-    setNewReminderText("");
-    toast({
-      title: "Reminder Added",
-      description: "Task added to checklist",
-    });
+      if (error) throw error;
+
+      setChecklists(checklists.map(checklist => {
+        if (checklist.id === checklistId) {
+          return {
+            ...checklist,
+            reminders: [
+              ...checklist.reminders,
+              {
+                id: data.id,
+                text: newReminderText,
+                completed: false,
+              }
+            ]
+          };
+        }
+        return checklist;
+      }));
+
+      setNewReminderText("");
+      toast({
+        title: "Reminder Added",
+        description: "Task added to checklist",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const toggleReminder = (checklistId: string, reminderId: string) => {
-    setChecklists(checklists.map(checklist => {
-      if (checklist.id === checklistId) {
-        return {
-          ...checklist,
-          reminders: checklist.reminders.map(reminder =>
-            reminder.id === reminderId
-              ? { ...reminder, completed: !reminder.completed }
-              : reminder
-          )
-        };
-      }
-      return checklist;
-    }));
+  const toggleReminder = async (checklistId: string, reminderId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    const reminder = checklist?.reminders.find(r => r.id === reminderId);
+    
+    if (!reminder) return;
+
+    try {
+      const newCompleted = !reminder.completed;
+      const { error } = await supabase
+        .from("checklist_reminders")
+        .update({ encrypted_completed: newCompleted.toString() })
+        .eq("id", reminderId);
+
+      if (error) throw error;
+
+      setChecklists(checklists.map(checklist => {
+        if (checklist.id === checklistId) {
+          return {
+            ...checklist,
+            reminders: checklist.reminders.map(reminder =>
+              reminder.id === reminderId
+                ? { ...reminder, completed: newCompleted }
+                : reminder
+            )
+          };
+        }
+        return checklist;
+      }));
+    } catch (error) {
+      console.error("Error updating reminder:", error);
+    }
   };
 
-  const deleteChecklist = (checklistId: string) => {
-    setChecklists(checklists.filter(c => c.id !== checklistId));
-    toast({
-      title: "Checklist Removed",
-      description: "Operation deleted from system",
-    });
+  const deleteChecklist = async (checklistId: string) => {
+    try {
+      const { error } = await supabase
+        .from("checklists")
+        .delete()
+        .eq("id", checklistId);
+
+      if (error) throw error;
+
+      setChecklists(checklists.filter(c => c.id !== checklistId));
+      toast({
+        title: "Checklist Removed",
+        description: "Operation deleted from system",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return <div className="text-center p-8">Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">
