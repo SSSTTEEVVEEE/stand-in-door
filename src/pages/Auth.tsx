@@ -128,9 +128,7 @@ const Auth = () => {
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2">STAND</h1>
-          <p className="text-muted-foreground text-xs tracking-widest uppercase">
-            in the door
-          </p>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">in the door</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -176,10 +174,7 @@ const Auth = () => {
           </button>
         </div>
 
-        <div className="mt-8 text-center text-xs text-muted-foreground">
-          <p>🔒 Zero-knowledge encryption enabled</p>
-          <p className="mt-1">Your data is encrypted with your password</p>
-        </div>
+        <div className="mt-8 text-center text-xs text-muted-foreground"></div>
       </Card>
     </div>
   );
