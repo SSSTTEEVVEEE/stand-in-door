@@ -14,16 +14,283 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      calendar_events: {
+        Row: {
+          created_at: string
+          encrypted_created_at: string
+          encrypted_date: string
+          encrypted_description: string | null
+          encrypted_time: string
+          encrypted_title: string
+          id: string
+          pseudonym_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_created_at: string
+          encrypted_date: string
+          encrypted_description?: string | null
+          encrypted_time: string
+          encrypted_title: string
+          id?: string
+          pseudonym_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_created_at?: string
+          encrypted_date?: string
+          encrypted_description?: string | null
+          encrypted_time?: string
+          encrypted_title?: string
+          id?: string
+          pseudonym_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_pseudonym_id_fkey"
+            columns: ["pseudonym_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["pseudonym_id"]
+          },
+        ]
+      }
+      checklist_reminders: {
+        Row: {
+          checklist_id: string
+          created_at: string
+          encrypted_completed: string
+          encrypted_created_at: string
+          encrypted_text: string
+          id: string
+        }
+        Insert: {
+          checklist_id: string
+          created_at?: string
+          encrypted_completed: string
+          encrypted_created_at: string
+          encrypted_text: string
+          id?: string
+        }
+        Update: {
+          checklist_id?: string
+          created_at?: string
+          encrypted_completed?: string
+          encrypted_created_at?: string
+          encrypted_text?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_reminders_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklists: {
+        Row: {
+          created_at: string
+          encrypted_created_at: string
+          encrypted_name: string
+          id: string
+          pseudonym_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_created_at: string
+          encrypted_name: string
+          id?: string
+          pseudonym_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_created_at?: string
+          encrypted_name?: string
+          id?: string
+          pseudonym_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklists_pseudonym_id_fkey"
+            columns: ["pseudonym_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["pseudonym_id"]
+          },
+        ]
+      }
+      chores: {
+        Row: {
+          created_at: string
+          encrypted_created_at: string
+          encrypted_name: string
+          encrypted_period: string
+          encrypted_updated_at: string
+          id: string
+          pseudonym_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_created_at: string
+          encrypted_name: string
+          encrypted_period: string
+          encrypted_updated_at: string
+          id?: string
+          pseudonym_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_created_at?: string
+          encrypted_name?: string
+          encrypted_period?: string
+          encrypted_updated_at?: string
+          id?: string
+          pseudonym_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chores_pseudonym_id_fkey"
+            columns: ["pseudonym_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["pseudonym_id"]
+          },
+        ]
+      }
+      failed_auth_attempts: {
+        Row: {
+          attempt_time: string
+          email: string
+          id: string
+          ip_address: string | null
+          navigator_data: Json | null
+          reason: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          attempt_time?: string
+          email: string
+          id?: string
+          ip_address?: string | null
+          navigator_data?: Json | null
+          reason?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          attempt_time?: string
+          email?: string
+          id?: string
+          ip_address?: string | null
+          navigator_data?: Json | null
+          reason?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      focus_monitoring: {
+        Row: {
+          created_at: string
+          encrypted_field_name: string
+          encrypted_focus_duration: string
+          encrypted_timestamp: string
+          id: string
+          pseudonym_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_field_name: string
+          encrypted_focus_duration: string
+          encrypted_timestamp: string
+          id?: string
+          pseudonym_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_field_name?: string
+          encrypted_focus_duration?: string
+          encrypted_timestamp?: string
+          id?: string
+          pseudonym_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_monitoring_pseudonym_id_fkey"
+            columns: ["pseudonym_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["pseudonym_id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          encrypted_email: string | null
+          encryption_salt: string
+          id: string
+          pseudonym_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_email?: string | null
+          encryption_salt: string
+          id?: string
+          pseudonym_id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_email?: string | null
+          encryption_salt?: string
+          id?: string
+          pseudonym_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +417,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "admin"],
+    },
   },
 } as const
