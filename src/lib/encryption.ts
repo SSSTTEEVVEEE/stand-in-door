@@ -10,26 +10,44 @@ export class EncryptionService {
 
   // Derive encryption key from password using PBKDF2
   static async deriveKey(password: string, salt: string): Promise<CryptoKey> {
-    const passwordKey = await crypto.subtle.importKey(
-      'raw',
-      this.encoder.encode(password),
-      'PBKDF2',
-      false,
-      ['deriveBits', 'deriveKey']
-    );
+    try {
+      console.log('[Encryption] Starting key derivation...');
+      
+      if (!password || password.length < 6) {
+        throw new Error('Password must be at least 6 characters');
+      }
+      
+      if (!salt || salt.length === 0) {
+        throw new Error('Encryption salt is required');
+      }
+      
+      const passwordKey = await crypto.subtle.importKey(
+        'raw',
+        this.encoder.encode(password),
+        'PBKDF2',
+        false,
+        ['deriveBits', 'deriveKey']
+      );
 
-    return crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: this.encoder.encode(salt),
-        iterations: PBKDF2_ITERATIONS,
-        hash: 'SHA-256'
-      },
-      passwordKey,
-      { name: 'AES-GCM', length: KEY_LENGTH },
-      false,
-      ['encrypt', 'decrypt']
-    );
+      const derivedKey = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: this.encoder.encode(salt),
+          iterations: PBKDF2_ITERATIONS,
+          hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: KEY_LENGTH },
+        false,
+        ['encrypt', 'decrypt']
+      );
+      
+      console.log('[Encryption] Key derivation successful');
+      return derivedKey;
+    } catch (error) {
+      console.error('[Encryption] Key derivation failed:', error);
+      throw new Error(`Encryption key derivation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   // Encrypt data with AES-256-GCM

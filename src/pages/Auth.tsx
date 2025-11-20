@@ -20,13 +20,51 @@ const Auth = () => {
     // Check if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        console.log('[Auth] User already logged in, redirecting to /app');
         navigate("/app");
       }
     });
   }, [navigate]);
 
+  // Track failed login attempts for fraud detection (3 strikes rule)
+  const getFailedAttempts = (email: string): number => {
+    try {
+      const key = `failed_attempts_${email}`;
+      const attempts = sessionStorage.getItem(key);
+      return attempts ? parseInt(attempts, 10) : 0;
+    } catch (error) {
+      console.error('[Auth] Error reading failed attempts:', error);
+      return 0;
+    }
+  };
+
+  const incrementFailedAttempts = (email: string): number => {
+    try {
+      const key = `failed_attempts_${email}`;
+      const currentAttempts = getFailedAttempts(email);
+      const newAttempts = currentAttempts + 1;
+      sessionStorage.setItem(key, newAttempts.toString());
+      console.log(`[Auth] Failed attempts for ${email}: ${newAttempts}`);
+      return newAttempts;
+    } catch (error) {
+      console.error('[Auth] Error incrementing failed attempts:', error);
+      return 1;
+    }
+  };
+
+  const clearFailedAttempts = (email: string): void => {
+    try {
+      const key = `failed_attempts_${email}`;
+      sessionStorage.removeItem(key);
+      console.log(`[Auth] Cleared failed attempts for ${email}`);
+    } catch (error) {
+      console.error('[Auth] Error clearing failed attempts:', error);
+    }
+  };
+
   const trackFailedAttempt = async (email: string, reason: string) => {
     try {
+      console.log('[Auth] Tracking failed attempt:', { email, reason });
       const navigatorData = {
         userAgent: navigator.userAgent,
         language: navigator.language,
@@ -34,14 +72,20 @@ const Auth = () => {
         cookieEnabled: navigator.cookieEnabled,
       };
 
-      await supabase.from("failed_auth_attempts").insert({
+      const { error } = await supabase.from("failed_auth_attempts").insert({
         email,
         reason,
         navigator_data: navigatorData,
         user_agent: navigator.userAgent,
       });
+
+      if (error) {
+        console.error('[Auth] Failed to track auth attempt:', error);
+      } else {
+        console.log('[Auth] Successfully tracked fraud telemetry for:', email);
+      }
     } catch (error) {
-      console.error("Failed to track auth attempt");
+      console.error('[Auth] Exception tracking auth attempt:', error);
     }
   };
 
@@ -49,25 +93,46 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    console.log(`[Auth] ${isLogin ? 'Login' : 'Signup'} attempt for:`, email);
+
     try {
       if (isLogin) {
+        console.log('[Auth] Starting login process...');
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) {
-          await trackFailedAttempt(email, error.message);
+          console.error('[Auth] Login error:', error);
+          
+          // Increment failed attempts counter
+          const attempts = incrementFailedAttempts(email);
+          
+          // Only track in database after 3 failed attempts (fraud telemetry)
+          if (attempts >= 3) {
+            console.warn('[Auth] FRAUD ALERT: 3+ failed login attempts detected for:', email);
+            await trackFailedAttempt(email, `Multiple failed attempts: ${error.message}`);
+          }
+          
           toast({
             title: "Authentication Failed",
-            description: error.message,
+            description: attempts >= 3 
+              ? "Multiple failed attempts detected. Please verify your credentials."
+              : error.message,
             variant: "destructive",
           });
           return;
         }
 
         if (data.user) {
+          console.log('[Auth] Login successful for user:', data.user.id);
+          
+          // Clear failed attempts on successful login
+          clearFailedAttempts(email);
+          
           try {
+            console.log('[Auth] Fetching user profile...');
             // Derive encryption key from password
             const { data: profile, error: profileError } = await supabase
               .from("profiles")
@@ -75,30 +140,25 @@ const Auth = () => {
               .eq("user_id", data.user.id)
               .single();
 
-            if (profileError || !profile) {
-              console.error("Profile fetch error:", profileError);
-              toast({
-                title: "Encryption Error",
-                description: "Could not initialize encryption. Please try again or contact support.",
-                variant: "destructive",
-              });
-              await supabase.auth.signOut();
-              return;
+            if (profileError) {
+              console.error('[Auth] Profile fetch error:', profileError);
+              throw new Error(`Profile fetch failed: ${profileError.message}`);
+            }
+
+            if (!profile) {
+              console.error('[Auth] No profile found for user:', data.user.id);
+              throw new Error("User profile not found");
             }
 
             if (!profile.encryption_salt) {
-              console.error("No encryption salt found");
-              toast({
-                title: "Encryption Error",
-                description: "Encryption configuration missing. Please contact support.",
-                variant: "destructive",
-              });
-              await supabase.auth.signOut();
-              return;
+              console.error('[Auth] No encryption salt in profile');
+              throw new Error("Encryption configuration missing");
             }
 
+            console.log('[Auth] Deriving encryption key...');
             const key = await EncryptionService.deriveKey(password, profile.encryption_salt);
             EncryptionService.storeKey(data.user.id, key);
+            console.log('[Auth] Encryption key stored successfully');
 
             toast({
               title: "Access Granted",
@@ -106,16 +166,17 @@ const Auth = () => {
             });
             navigate("/app");
           } catch (encryptionError: any) {
-            console.error("Encryption initialization failed:", encryptionError);
+            console.error('[Auth] Encryption initialization failed:', encryptionError);
             toast({
               title: "Encryption Failed",
-              description: "Could not initialize encryption. Please try again.",
+              description: encryptionError.message || "Could not initialize encryption. Please try again.",
               variant: "destructive",
             });
             await supabase.auth.signOut();
           }
         }
       } else {
+        console.log('[Auth] Starting signup process...');
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -125,7 +186,11 @@ const Auth = () => {
         });
 
         if (error) {
-          await trackFailedAttempt(email, error.message);
+          console.error('[Auth] Signup error:', error);
+          
+          // Track signup errors as fraud telemetry
+          await trackFailedAttempt(email, `Signup error: ${error.message}`);
+          
           toast({
             title: "Registration Failed",
             description: error.message,
@@ -135,47 +200,58 @@ const Auth = () => {
         }
 
         if (data.user) {
-          // Wait a moment for the profile to be created by the trigger
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log('[Auth] Signup successful, user ID:', data.user.id);
+          
+          // Wait for the database trigger to create profile
+          console.log('[Auth] Waiting for profile creation...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           try {
+            console.log('[Auth] Verifying profile creation...');
             // Verify profile was created with encryption salt
             const { data: profile, error: profileError } = await supabase
               .from("profiles")
-              .select("encryption_salt")
+              .select("encryption_salt, pseudonym_id")
               .eq("user_id", data.user.id)
               .single();
 
-            if (profileError || !profile || !profile.encryption_salt) {
-              console.error("Profile creation verification failed:", profileError);
-              toast({
-                title: "Setup Error",
-                description: "Account created but encryption setup failed. Please try logging in.",
-                variant: "destructive",
-              });
-              setIsLogin(true);
-              return;
+            if (profileError) {
+              console.error('[Auth] Profile verification error:', profileError);
+              throw new Error(`Profile verification failed: ${profileError.message}`);
             }
 
+            if (!profile || !profile.encryption_salt) {
+              console.error('[Auth] Profile missing or incomplete:', profile);
+              throw new Error("Encryption setup incomplete");
+            }
+
+            console.log('[Auth] Profile verified successfully');
             toast({
               title: "Account Created",
               description: "You can now log in with your credentials",
             });
             setIsLogin(true);
-          } catch (verificationError) {
-            console.error("Profile verification error:", verificationError);
+            
+            // Clear the form
+            setPassword("");
+          } catch (verificationError: any) {
+            console.error('[Auth] Profile verification failed:', verificationError);
             toast({
-              title: "Account Created",
-              description: "Please try logging in",
+              title: "Setup Error",
+              description: verificationError.message || "Account created but encryption setup incomplete. Please contact support.",
+              variant: "destructive",
             });
-            setIsLogin(true);
+            
+            // Track this critical error
+            await trackFailedAttempt(email, `Profile setup failed: ${verificationError.message}`);
           }
         }
       }
     } catch (error: any) {
+      console.error('[Auth] Unexpected error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {

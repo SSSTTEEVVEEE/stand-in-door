@@ -16,19 +16,25 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[Index] Initializing authentication check...');
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       if (!session) {
+        console.log('[Index] No active session, redirecting to landing page');
         navigate("/");
+      } else {
+        console.log('[Index] Active session found for user:', session.user.id);
       }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[Index] Auth state changed:', _event);
       setUser(session?.user ?? null);
       if (!session) {
+        console.log('[Index] Session ended, redirecting to landing page');
         navigate("/");
       }
     });
@@ -37,10 +43,12 @@ const Index = () => {
   }, [navigate]);
 
   const handleLogout = async () => {
+    console.log('[Index] Logging out user...');
     if (user) {
       EncryptionService.clearKey(user.id);
     }
     await supabase.auth.signOut();
+    console.log('[Index] Logout complete, redirecting to landing page');
     navigate("/");
   };
 
