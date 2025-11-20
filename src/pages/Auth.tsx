@@ -20,7 +20,7 @@ const Auth = () => {
     // Check if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        navigate("/app");
       }
     });
   }, [navigate]);
@@ -104,7 +104,7 @@ const Auth = () => {
               title: "Access Granted",
               description: "Authentication successful",
             });
-            navigate("/");
+            navigate("/app");
           } catch (encryptionError: any) {
             console.error("Encryption initialization failed:", encryptionError);
             toast({

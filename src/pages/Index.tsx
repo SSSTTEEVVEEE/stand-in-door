@@ -21,7 +21,7 @@ const Index = () => {
       setUser(session?.user ?? null);
       setLoading(false);
       if (!session) {
-        navigate("/auth");
+        navigate("/");
       }
     });
 
@@ -29,7 +29,7 @@ const Index = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (!session) {
-        navigate("/auth");
+        navigate("/");
       }
     });
 
@@ -41,7 +41,7 @@ const Index = () => {
       EncryptionService.clearKey(user.id);
     }
     await supabase.auth.signOut();
-    navigate("/auth");
+    navigate("/");
   };
 
   if (loading) {
