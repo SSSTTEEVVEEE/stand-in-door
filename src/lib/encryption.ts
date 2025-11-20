@@ -69,15 +69,31 @@ export class EncryptionService {
 
   // Store encryption key in session storage (cleared on logout)
   static storeKey(userId: string, key: CryptoKey): void {
-    // We can't directly store CryptoKey, so we store a flag
-    sessionStorage.setItem(`enc_session_${userId}`, 'active');
+    try {
+      // We can't directly store CryptoKey, so we store a flag
+      sessionStorage.setItem(`enc_session_${userId}`, 'active');
+      console.log('Encryption key session initialized for user:', userId);
+    } catch (error) {
+      console.error('Failed to store encryption session:', error);
+      throw new Error('Could not initialize encryption session');
+    }
   }
 
   static clearKey(userId: string): void {
-    sessionStorage.removeItem(`enc_session_${userId}`);
+    try {
+      sessionStorage.removeItem(`enc_session_${userId}`);
+      console.log('Encryption key session cleared for user:', userId);
+    } catch (error) {
+      console.error('Failed to clear encryption session:', error);
+    }
   }
 
   static hasKey(userId: string): boolean {
-    return sessionStorage.getItem(`enc_session_${userId}`) === 'active';
+    try {
+      return sessionStorage.getItem(`enc_session_${userId}`) === 'active';
+    } catch (error) {
+      console.error('Failed to check encryption session:', error);
+      return false;
+    }
   }
 }

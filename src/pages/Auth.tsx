@@ -67,23 +67,53 @@ const Auth = () => {
         }
 
         if (data.user) {
-          // Derive encryption key from password
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("encryption_salt")
-            .eq("user_id", data.user.id)
-            .single();
+          try {
+            // Derive encryption key from password
+            const { data: profile, error: profileError } = await supabase
+              .from("profiles")
+              .select("encryption_salt")
+              .eq("user_id", data.user.id)
+              .single();
 
-          if (profile) {
+            if (profileError || !profile) {
+              console.error("Profile fetch error:", profileError);
+              toast({
+                title: "Encryption Error",
+                description: "Could not initialize encryption. Please try again or contact support.",
+                variant: "destructive",
+              });
+              await supabase.auth.signOut();
+              return;
+            }
+
+            if (!profile.encryption_salt) {
+              console.error("No encryption salt found");
+              toast({
+                title: "Encryption Error",
+                description: "Encryption configuration missing. Please contact support.",
+                variant: "destructive",
+              });
+              await supabase.auth.signOut();
+              return;
+            }
+
             const key = await EncryptionService.deriveKey(password, profile.encryption_salt);
             EncryptionService.storeKey(data.user.id, key);
-          }
 
-          toast({
-            title: "Access Granted",
-            description: "Authentication successful",
-          });
-          navigate("/");
+            toast({
+              title: "Access Granted",
+              description: "Authentication successful",
+            });
+            navigate("/");
+          } catch (encryptionError: any) {
+            console.error("Encryption initialization failed:", encryptionError);
+            toast({
+              title: "Encryption Failed",
+              description: "Could not initialize encryption. Please try again.",
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+          }
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -105,11 +135,41 @@ const Auth = () => {
         }
 
         if (data.user) {
-          toast({
-            title: "Account Created",
-            description: "You can now log in",
-          });
-          setIsLogin(true);
+          // Wait a moment for the profile to be created by the trigger
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          try {
+            // Verify profile was created with encryption salt
+            const { data: profile, error: profileError } = await supabase
+              .from("profiles")
+              .select("encryption_salt")
+              .eq("user_id", data.user.id)
+              .single();
+
+            if (profileError || !profile || !profile.encryption_salt) {
+              console.error("Profile creation verification failed:", profileError);
+              toast({
+                title: "Setup Error",
+                description: "Account created but encryption setup failed. Please try logging in.",
+                variant: "destructive",
+              });
+              setIsLogin(true);
+              return;
+            }
+
+            toast({
+              title: "Account Created",
+              description: "You can now log in with your credentials",
+            });
+            setIsLogin(true);
+          } catch (verificationError) {
+            console.error("Profile verification error:", verificationError);
+            toast({
+              title: "Account Created",
+              description: "Please try logging in",
+            });
+            setIsLogin(true);
+          }
         }
       }
     } catch (error: any) {
