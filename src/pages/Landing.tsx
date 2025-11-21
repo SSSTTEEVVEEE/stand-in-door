@@ -26,7 +26,7 @@ const Landing = () => {
 
         <div className="mt-12 text-sm text-muted-foreground space-y-2 max-w-md mx-auto">
           <p className="font-semibold">What We Collect:</p>
-          <p>All data is entirely self-input by you. We collect only what you choose to enter:</p>
+          <p>All data is entirely self-input by you.</p>
           <ul className="list-disc list-inside space-y-1 text-left">
             <li>Tasks and chores you create</li>
             <li>Checklists and calendar events you add</li>
