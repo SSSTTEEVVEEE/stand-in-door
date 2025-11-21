@@ -9,28 +9,17 @@ const Landing = () => {
       <div className="max-w-2xl text-center space-y-8">
         <div>
           <h1 className="text-6xl md:text-8xl font-bold mb-4">STAND</h1>
-          <p className="text-muted-foreground text-sm tracking-widest uppercase mb-2">
-            in the door
-          </p>
+          <p className="text-muted-foreground text-sm tracking-widest uppercase mb-2">in the door</p>
           <p className="text-lg text-foreground/80 max-w-xl mx-auto">
-            A zero-knowledge encrypted task management system. Your data, your control, your privacy.
+            A simple task management system. Your data, your control.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button 
-            size="lg" 
-            className="font-bold text-lg px-8"
-            onClick={() => navigate("/auth")}
-          >
+          <Button size="lg" className="font-bold text-lg px-8" onClick={() => navigate("/auth")}>
             DEPLOY
           </Button>
-          <Button 
-            size="lg" 
-            variant="outline" 
-            className="font-bold text-lg px-8"
-            onClick={() => navigate("/terms")}
-          >
+          <Button size="lg" variant="outline" className="font-bold text-lg px-8" onClick={() => navigate("/terms")}>
             TERMS
           </Button>
         </div>
