@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useEncryption } from "@/contexts/EncryptionContext";
 
 interface CalendarEvent {
   id: string;
@@ -16,6 +17,7 @@ interface CalendarEvent {
 
 const CalendarSection = () => {
   const { toast } = useToast();
+  const { encrypt, decrypt, pseudonymId } = useEncryption();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -24,42 +26,50 @@ const CalendarSection = () => {
     description: "",
   });
   const [loading, setLoading] = useState(true);
-  const [pseudonymId, setPseudonymId] = useState<string>("");
 
   useEffect(() => {
     loadEvents();
   }, []);
 
   const loadEvents = async () => {
+    if (!pseudonymId) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: eventsData } = await supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("pseudonym_id", pseudonymId);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("pseudonym_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (profile) {
-        setPseudonymId(profile.pseudonym_id);
-
-        const { data: eventsData } = await supabase
-          .from("calendar_events")
-          .select("*")
-          .eq("pseudonym_id", profile.pseudonym_id);
-
-        if (eventsData) {
-          setEvents(eventsData.map(e => ({
-            id: e.id,
-            title: e.encrypted_title,
-            date: e.encrypted_date,
-            time: e.encrypted_time,
-            description: e.encrypted_description || ""
-          })).sort((a, b) => 
-            new Date(a.date + " " + a.time).getTime() - new Date(b.date + " " + b.time).getTime()
-          ));
-        }
+      if (eventsData) {
+        const decryptedEvents = await Promise.all(
+          eventsData.map(async (e) => {
+            try {
+              const title = await decrypt(e.encrypted_title, e.data_hash || undefined);
+              const date = await decrypt(e.encrypted_date, e.data_hash || undefined);
+              const time = await decrypt(e.encrypted_time, e.data_hash || undefined);
+              const description = e.encrypted_description 
+                ? await decrypt(e.encrypted_description, e.data_hash || undefined)
+                : "";
+              return {
+                id: e.id,
+                title,
+                date,
+                time,
+                description,
+              };
+            } catch (error) {
+              console.error("Error decrypting event:", error);
+              return null;
+            }
+          })
+        );
+        const validEvents = decryptedEvents.filter((e) => e !== null) as CalendarEvent[];
+        setEvents(validEvents.sort((a, b) => 
+          new Date(a.date + " " + a.time).getTime() - new Date(b.date + " " + b.time).getTime()
+        ));
       }
     } catch (error) {
       console.error("Error loading events:", error);
@@ -80,15 +90,26 @@ const CalendarSection = () => {
 
     try {
       const now = new Date().toISOString();
+      const { encrypted: encryptedTitle, hash: titleHash } = await encrypt(newEvent.title);
+      const { encrypted: encryptedDate, hash: dateHash } = await encrypt(newEvent.date);
+      const { encrypted: encryptedTime, hash: timeHash } = await encrypt(newEvent.time);
+      const { encrypted: encryptedDescription, hash: descHash } = await encrypt(newEvent.description || "");
+      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
+
+      // Combine all data for integrity hash
+      const combinedData = `${newEvent.title}|${newEvent.date}|${newEvent.time}|${newEvent.description}|${now}`;
+      const { hash: dataHash } = await encrypt(combinedData);
+
       const { data, error } = await supabase
         .from("calendar_events")
         .insert({
           pseudonym_id: pseudonymId,
-          encrypted_title: newEvent.title,
-          encrypted_date: newEvent.date,
-          encrypted_time: newEvent.time,
-          encrypted_description: newEvent.description,
-          encrypted_created_at: now,
+          encrypted_title: encryptedTitle,
+          encrypted_date: encryptedDate,
+          encrypted_time: encryptedTime,
+          encrypted_description: encryptedDescription,
+          encrypted_created_at: encryptedCreatedAt,
+          data_hash: dataHash,
         })
         .select()
         .single();

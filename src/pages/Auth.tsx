@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { EncryptionService } from "@/lib/encryption";
+import { setSessionEncryptionKey, clearSessionEncryptionKey } from "@/contexts/EncryptionContext";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -196,6 +197,7 @@ const Auth = () => {
                 
                 // Use the newly created profile
                 const key = await EncryptionService.deriveKey(password, newProfile.encryption_salt);
+                setSessionEncryptionKey(key);
                 EncryptionService.storeKey(data.user.id, key);
                 console.log('[Auth] Encryption key stored successfully');
                 
@@ -218,6 +220,7 @@ const Auth = () => {
 
             console.log('[Auth] Deriving encryption key...');
             const key = await EncryptionService.deriveKey(password, profile.encryption_salt);
+            setSessionEncryptionKey(key);
             EncryptionService.storeKey(data.user.id, key);
             console.log('[Auth] Encryption key stored successfully');
 

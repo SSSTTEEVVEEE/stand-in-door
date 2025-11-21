@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useEncryption } from "@/contexts/EncryptionContext";
 
 interface Chore {
   id?: string;
@@ -15,6 +16,7 @@ interface Chore {
 
 const ChoresSection = () => {
   const { toast } = useToast();
+  const { encrypt, decrypt, pseudonymId } = useEncryption();
   const [chores, setChores] = useState<Chore[]>([]);
   const [newChoreName, setNewChoreName] = useState("");
   const [newChorePeriod, setNewChorePeriod] = useState("");
@@ -22,35 +24,41 @@ const ChoresSection = () => {
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [pseudonymId, setPseudonymId] = useState<string>("");
 
   useEffect(() => {
     loadChores();
   }, []);
 
   const loadChores = async () => {
+    if (!pseudonymId) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: choresData } = await supabase
+        .from("chores")
+        .select("*")
+        .eq("pseudonym_id", pseudonymId);
 
-      const { data: profile } = await supabase.from("profiles").select("pseudonym_id").eq("user_id", user.id).single();
-
-      if (profile) {
-        setPseudonymId(profile.pseudonym_id);
-
-        const { data: choresData } = await supabase.from("chores").select("*").eq("pseudonym_id", profile.pseudonym_id);
-
-        if (choresData) {
-          setChores(
-            choresData.map((c) => ({
-              id: c.id,
-              name: c.encrypted_name,
-              period: parseInt(c.encrypted_period),
-            })),
-          );
-        }
+      if (choresData) {
+        const decryptedChores = await Promise.all(
+          choresData.map(async (c) => {
+            try {
+              const name = await decrypt(c.encrypted_name, c.data_hash || undefined);
+              const period = parseInt(await decrypt(c.encrypted_period, c.data_hash || undefined));
+              return {
+                id: c.id,
+                name,
+                period,
+              };
+            } catch (error) {
+              console.error("Error decrypting chore:", error);
+              return null;
+            }
+          })
+        );
+        setChores(decryptedChores.filter((c) => c !== null) as Chore[]);
       }
     } catch (error) {
       console.error("Error loading chores:", error);
@@ -81,14 +89,24 @@ const ChoresSection = () => {
 
     try {
       const now = new Date().toISOString();
+      const { encrypted: encryptedName, hash: nameHash } = await encrypt(newChoreName);
+      const { encrypted: encryptedPeriod, hash: periodHash } = await encrypt(period.toString());
+      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
+      const { encrypted: encryptedUpdatedAt, hash: updatedHash } = await encrypt(now);
+
+      // Combine all hashes for integrity check
+      const combinedData = `${newChoreName}|${period}|${now}`;
+      const { hash: dataHash } = await encrypt(combinedData);
+
       const { data, error } = await supabase
         .from("chores")
         .insert({
           pseudonym_id: pseudonymId,
-          encrypted_name: newChoreName,
-          encrypted_period: period.toString(),
-          encrypted_created_at: now,
-          encrypted_updated_at: now,
+          encrypted_name: encryptedName,
+          encrypted_period: encryptedPeriod,
+          encrypted_created_at: encryptedCreatedAt,
+          encrypted_updated_at: encryptedUpdatedAt,
+          data_hash: dataHash,
         })
         .select()
         .single();
