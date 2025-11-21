@@ -43,18 +43,18 @@ export const useEncryption = () => {
     initializeEncryption();
   }, []);
 
-  const encrypt = async (data: string): Promise<string> => {
+  const encrypt = async (data: string): Promise<{ encrypted: string; hash: string }> => {
     if (!encryptionKey) {
       throw new Error("Encryption key not available");
     }
     return EncryptionService.encrypt(data, encryptionKey);
   };
 
-  const decrypt = async (encryptedData: string): Promise<string> => {
+  const decrypt = async (encryptedData: string, expectedHash?: string): Promise<string> => {
     if (!encryptionKey) {
       throw new Error("Encryption key not available");
     }
-    return EncryptionService.decrypt(encryptedData, encryptionKey);
+    return EncryptionService.decrypt(encryptedData, encryptionKey, expectedHash);
   };
 
   return {

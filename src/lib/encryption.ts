@@ -1,5 +1,7 @@
 // Client-side zero-knowledge encryption utilities
-// Uses Web Crypto API for AES-256-GCM encryption
+// Uses Web Crypto API for AES-256-GCM encryption with SHA3-512 integrity validation
+
+import { sha3_512 } from 'js-sha3';
 
 const PBKDF2_ITERATIONS = 100000;
 const KEY_LENGTH = 256;
@@ -50,8 +52,13 @@ export class EncryptionService {
     }
   }
 
-  // Encrypt data with AES-256-GCM
-  static async encrypt(data: string, key: CryptoKey): Promise<string> {
+  // Compute SHA3-512 hash for data integrity
+  static computeHash(data: string): string {
+    return sha3_512(data);
+  }
+
+  // Encrypt data with AES-256-GCM and return with hash
+  static async encrypt(data: string, key: CryptoKey): Promise<{ encrypted: string; hash: string }> {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
@@ -64,11 +71,14 @@ export class EncryptionService {
     combined.set(iv);
     combined.set(new Uint8Array(encrypted), iv.length);
 
-    return btoa(String.fromCharCode(...combined));
+    const encryptedString = btoa(String.fromCharCode(...combined));
+    const hash = this.computeHash(data);
+
+    return { encrypted: encryptedString, hash };
   }
 
-  // Decrypt data with AES-256-GCM
-  static async decrypt(encryptedData: string, key: CryptoKey): Promise<string> {
+  // Decrypt data with AES-256-GCM and verify hash
+  static async decrypt(encryptedData: string, key: CryptoKey, expectedHash?: string): Promise<string> {
     const combined = new Uint8Array(
       atob(encryptedData).split('').map(c => c.charCodeAt(0))
     );
@@ -82,7 +92,17 @@ export class EncryptionService {
       data
     );
 
-    return this.decoder.decode(decrypted);
+    const decryptedString = this.decoder.decode(decrypted);
+
+    // Verify data integrity if hash provided
+    if (expectedHash) {
+      const computedHash = this.computeHash(decryptedString);
+      if (computedHash !== expectedHash) {
+        throw new Error('Data integrity check failed: hash mismatch');
+      }
+    }
+
+    return decryptedString;
   }
 
   // Store encryption key in session storage (cleared on logout)

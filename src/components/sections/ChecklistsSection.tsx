@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useEncryption } from "@/contexts/EncryptionContext";
 
 interface Reminder {
   id: string;
@@ -21,47 +22,62 @@ interface Checklist {
 
 const ChecklistsSection = () => {
   const { toast } = useToast();
+  const { encrypt, decrypt, pseudonymId } = useEncryption();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [newChecklistName, setNewChecklistName] = useState("");
   const [newReminderText, setNewReminderText] = useState("");
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pseudonymId, setPseudonymId] = useState<string>("");
 
   useEffect(() => {
     loadChecklists();
   }, []);
 
   const loadChecklists = async () => {
+    if (!pseudonymId) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: checklistsData } = await supabase
+        .from("checklists")
+        .select("*, checklist_reminders(*)")
+        .eq("pseudonym_id", pseudonymId);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("pseudonym_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (profile) {
-        setPseudonymId(profile.pseudonym_id);
-
-        const { data: checklistsData } = await supabase
-          .from("checklists")
-          .select("*, checklist_reminders(*)")
-          .eq("pseudonym_id", profile.pseudonym_id);
-
-        if (checklistsData) {
-          setChecklists(checklistsData.map(c => ({
-            id: c.id,
-            name: c.encrypted_name,
-            reminders: c.checklist_reminders.map((r: any) => ({
-              id: r.id,
-              text: r.encrypted_text,
-              completed: r.encrypted_completed === "true"
-            }))
-          })));
-        }
+      if (checklistsData) {
+        const decryptedChecklists = await Promise.all(
+          checklistsData.map(async (c) => {
+            try {
+              const name = await decrypt(c.encrypted_name, c.data_hash || undefined);
+              const reminders = await Promise.all(
+                c.checklist_reminders.map(async (r: any) => {
+                  try {
+                    const text = await decrypt(r.encrypted_text, r.data_hash || undefined);
+                    const completedStr = await decrypt(r.encrypted_completed, r.data_hash || undefined);
+                    return {
+                      id: r.id,
+                      text,
+                      completed: completedStr === "true",
+                    };
+                  } catch (error) {
+                    console.error("Error decrypting reminder:", error);
+                    return null;
+                  }
+                })
+              );
+              return {
+                id: c.id,
+                name,
+                reminders: reminders.filter((r) => r !== null) as Reminder[],
+              };
+            } catch (error) {
+              console.error("Error decrypting checklist:", error);
+              return null;
+            }
+          })
+        );
+        setChecklists(decryptedChecklists.filter((c) => c !== null) as Checklist[]);
       }
     } catch (error) {
       console.error("Error loading checklists:", error);
@@ -82,12 +98,20 @@ const ChecklistsSection = () => {
 
     try {
       const now = new Date().toISOString();
+      const { encrypted: encryptedName, hash: nameHash } = await encrypt(newChecklistName);
+      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
+
+      // Combined data hash
+      const combinedData = `${newChecklistName}|${now}`;
+      const { hash: dataHash } = await encrypt(combinedData);
+
       const { data, error } = await supabase
         .from("checklists")
         .insert({
           pseudonym_id: pseudonymId,
-          encrypted_name: newChecklistName,
-          encrypted_created_at: now,
+          encrypted_name: encryptedName,
+          encrypted_created_at: encryptedCreatedAt,
+          data_hash: dataHash,
         })
         .select()
         .single();
@@ -127,13 +151,22 @@ const ChecklistsSection = () => {
 
     try {
       const now = new Date().toISOString();
+      const { encrypted: encryptedText, hash: textHash } = await encrypt(newReminderText);
+      const { encrypted: encryptedCompleted, hash: completedHash } = await encrypt("false");
+      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
+
+      // Combined data hash
+      const combinedData = `${newReminderText}|false|${now}`;
+      const { hash: dataHash } = await encrypt(combinedData);
+
       const { data, error } = await supabase
         .from("checklist_reminders")
         .insert({
           checklist_id: checklistId,
-          encrypted_text: newReminderText,
-          encrypted_completed: "false",
-          encrypted_created_at: now,
+          encrypted_text: encryptedText,
+          encrypted_completed: encryptedCompleted,
+          encrypted_created_at: encryptedCreatedAt,
+          data_hash: dataHash,
         })
         .select()
         .single();
@@ -179,9 +212,14 @@ const ChecklistsSection = () => {
 
     try {
       const newCompleted = !reminder.completed;
+      const { encrypted: encryptedCompleted, hash } = await encrypt(newCompleted.toString());
+      
       const { error } = await supabase
         .from("checklist_reminders")
-        .update({ encrypted_completed: newCompleted.toString() })
+        .update({ 
+          encrypted_completed: encryptedCompleted,
+          data_hash: hash 
+        })
         .eq("id", reminderId);
 
       if (error) throw error;
