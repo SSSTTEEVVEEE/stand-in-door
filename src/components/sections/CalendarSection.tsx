@@ -10,6 +10,7 @@ import { useEncryption } from "@/contexts/EncryptionContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { calendarEventSchema } from "@/lib/validation";
 
 interface CalendarEvent {
   id: string;
@@ -177,17 +178,25 @@ const CalendarSection = () => {
   };
 
   const addEvent = async () => {
-    if (!newEvent.title.trim() || !newEvent.date) {
+    // Validate input with zod schema
+    const validation = calendarEventSchema.safeParse({
+      title: newEvent.title,
+      description: newEvent.description || '',
+      date: newEvent.date,
+      time: newEvent.time || '09:00',
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.issues[0]?.message || "Invalid input";
       toast({
-        title: "Invalid Input",
-        description: "Title and date are required",
+        title: "Validation Error",
+        description: errorMessage,
         variant: "destructive",
       });
       return;
     }
 
     if (!pseudonymId) {
-      console.error('[CalendarSection] No pseudonym ID available');
       toast({
         title: "Session Error",
         description: "Your session data is missing. Please refresh the page.",
@@ -198,6 +207,8 @@ const CalendarSection = () => {
 
     try {
       const now = new Date().toISOString();
+      // Use validated and sanitized data
+      const { title, description, date, time } = validation.data;
       const { encrypted: encTitle } = await encrypt(newEvent.title);
       const { encrypted: encDate } = await encrypt(newEvent.date);
       const { encrypted: encTime } = await encrypt(newEvent.time);
@@ -246,10 +257,28 @@ const CalendarSection = () => {
   };
 
   const updateEvent = async () => {
-    if (!editingEvent || !newEvent.title.trim() || !newEvent.date) {
+    // Validate input with zod schema
+    const validation = calendarEventSchema.safeParse({
+      title: newEvent.title,
+      description: newEvent.description || '',
+      date: newEvent.date,
+      time: newEvent.time || '09:00',
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.issues[0]?.message || "Invalid input";
       toast({
-        title: "Invalid Input",
-        description: "Title and date are required",
+        title: "Validation Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!editingEvent) {
+      toast({
+        title: "Error",
+        description: "No event selected for editing",
         variant: "destructive",
       });
       return;
@@ -257,10 +286,12 @@ const CalendarSection = () => {
 
     try {
       const now = new Date().toISOString();
-      const { encrypted: encTitle } = await encrypt(newEvent.title);
-      const { encrypted: encDate } = await encrypt(newEvent.date);
-      const { encrypted: encTime } = await encrypt(newEvent.time);
-      const { encrypted: encDesc } = await encrypt(newEvent.description || "");
+      // Use validated and sanitized data
+      const { title, description, date, time } = validation.data;
+      const { encrypted: encTitle } = await encrypt(title);
+      const { encrypted: encDate } = await encrypt(date);
+      const { encrypted: encTime } = await encrypt(time);
+      const { encrypted: encDesc } = description ? await encrypt(description) : { encrypted: "" };
       const { encrypted: encCreated } = await encrypt(now);
 
       const { error } = await supabase
