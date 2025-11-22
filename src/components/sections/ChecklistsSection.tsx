@@ -25,7 +25,7 @@ interface Checklist {
 
 const ChecklistsSection = () => {
   const { toast } = useToast();
-  const { encrypt, decrypt, pseudonymId } = useEncryption();
+  const { encrypt, decrypt, pseudonymId, isReady } = useEncryption();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [newChecklistName, setNewChecklistName] = useState("");
   const [newReminderText, setNewReminderText] = useState("");
@@ -36,20 +36,32 @@ const ChecklistsSection = () => {
   const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    loadChecklists();
-  }, []);
+    if (isReady && pseudonymId) {
+      console.log('[ChecklistsSection] Encryption ready, loading checklists...');
+      loadChecklists();
+    }
+  }, [isReady, pseudonymId]);
 
   const loadChecklists = async () => {
     if (!pseudonymId) {
+      console.log('[ChecklistsSection] No pseudonym ID, skipping load');
       setLoading(false);
       return;
     }
 
+    console.log('[ChecklistsSection] Loading checklists...');
     try {
-      const { data: checklistsData } = await supabase
+      const { data: checklistsData, error } = await supabase
         .from("checklists")
         .select("*, checklist_reminders(*)")
         .eq("pseudonym_id", pseudonymId);
+
+      if (error) {
+        console.error('[ChecklistsSection] Error fetching checklists:', error);
+        throw error;
+      }
+
+      console.log(`[ChecklistsSection] Fetched ${checklistsData?.length || 0} checklists`);
 
       if (checklistsData) {
         const decryptedChecklists = await Promise.all(
@@ -68,6 +80,7 @@ const ChecklistsSection = () => {
                       isOneOff: false,
                     };
                   } catch (error) {
+                    console.error('[ChecklistsSection] Failed to decrypt reminder:', r.id, error);
                     return null;
                   }
                 })
@@ -80,14 +93,23 @@ const ChecklistsSection = () => {
                 isComplete: validReminders.length > 0 && validReminders.every(r => r.completed),
               };
             } catch (error) {
+              console.error('[ChecklistsSection] Failed to decrypt checklist:', c.id, error);
               return null;
             }
           })
         );
-        setChecklists(decryptedChecklists.filter((c) => c !== null) as Checklist[]);
+
+        const validChecklists = decryptedChecklists.filter((c) => c !== null) as Checklist[];
+        console.log(`[ChecklistsSection] Successfully decrypted ${validChecklists.length} checklists`);
+        setChecklists(validChecklists);
       }
     } catch (error) {
-      // Error loading checklists
+      console.error('[ChecklistsSection] Error loading checklists:', error);
+      toast({
+        title: "Error Loading Checklists",
+        description: "Could not load your checklists. Please try refreshing the page.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

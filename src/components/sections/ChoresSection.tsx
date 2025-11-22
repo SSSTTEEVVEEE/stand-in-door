@@ -16,7 +16,7 @@ interface Chore {
 
 const ChoresSection = () => {
   const { toast } = useToast();
-  const { encrypt, decrypt, pseudonymId } = useEncryption();
+  const { encrypt, decrypt, pseudonymId, isReady } = useEncryption();
   const [chores, setChores] = useState<Chore[]>([]);
   const [newChoreName, setNewChoreName] = useState("");
   const [newChorePeriod, setNewChorePeriod] = useState("");
@@ -26,20 +26,32 @@ const ChoresSection = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadChores();
-  }, []);
+    if (isReady && pseudonymId) {
+      console.log('[ChoresSection] Encryption ready, loading chores...');
+      loadChores();
+    }
+  }, [isReady, pseudonymId]);
 
   const loadChores = async () => {
     if (!pseudonymId) {
+      console.log('[ChoresSection] No pseudonym ID, skipping load');
       setLoading(false);
       return;
     }
 
+    console.log('[ChoresSection] Loading chores...');
     try {
-      const { data: choresData } = await supabase
+      const { data: choresData, error } = await supabase
         .from("chores")
         .select("*")
         .eq("pseudonym_id", pseudonymId);
+
+      if (error) {
+        console.error('[ChoresSection] Error fetching chores:', error);
+        throw error;
+      }
+
+      console.log(`[ChoresSection] Fetched ${choresData?.length || 0} chores`);
 
       if (choresData) {
         const decryptedChores = await Promise.all(
@@ -53,15 +65,23 @@ const ChoresSection = () => {
                 period,
               };
             } catch (error) {
-              console.error("Error decrypting chore:", error);
+              console.error('[ChoresSection] Failed to decrypt chore:', c.id, error);
               return null;
             }
           })
         );
-        setChores(decryptedChores.filter((c) => c !== null) as Chore[]);
+
+        const validChores = decryptedChores.filter((c) => c !== null) as Chore[];
+        console.log(`[ChoresSection] Successfully decrypted ${validChores.length} chores`);
+        setChores(validChores);
       }
     } catch (error) {
-      console.error("Error loading chores:", error);
+      console.error('[ChoresSection] Error loading chores:', error);
+      toast({
+        title: "Error Loading Chores",
+        description: "Could not load your chores. Please try refreshing the page.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
