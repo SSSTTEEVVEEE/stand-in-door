@@ -82,7 +82,8 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
   const encrypt = async (data: string): Promise<{ encrypted: string; hash: string }> => {
     const key = encryptionKey || getSessionEncryptionKey();
     if (!key) {
-      throw new Error("Encryption key not available");
+      console.error('[EncryptionContext] Encryption key not available');
+      throw new Error("Encryption key not available. Please log out and log back in.");
     }
     return EncryptionService.encrypt(data, key);
   };
@@ -90,7 +91,8 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
   const decrypt = async (encryptedData: string, expectedHash?: string): Promise<string> => {
     const key = encryptionKey || getSessionEncryptionKey();
     if (!key) {
-      throw new Error("Encryption key not available");
+      console.error('[EncryptionContext] Encryption key not available');
+      throw new Error("Encryption key not available. Please log out and log back in.");
     }
     return EncryptionService.decrypt(encryptedData, key, expectedHash);
   };
