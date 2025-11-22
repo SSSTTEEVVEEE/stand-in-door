@@ -57,8 +57,8 @@ const ChoresSection = () => {
         const decryptedChores = await Promise.all(
           choresData.map(async (c) => {
             try {
-              const name = await decrypt(c.encrypted_name, c.data_hash || undefined);
-              const period = parseInt(await decrypt(c.encrypted_period, c.data_hash || undefined));
+              const name = await decrypt(c.encrypted_name);
+              const period = parseInt(await decrypt(c.encrypted_period));
               return {
                 id: c.id,
                 name,

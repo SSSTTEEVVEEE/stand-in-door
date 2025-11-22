@@ -67,12 +67,12 @@ const ChecklistsSection = () => {
         const decryptedChecklists = await Promise.all(
           checklistsData.map(async (c) => {
             try {
-              const name = await decrypt(c.encrypted_name, c.data_hash || undefined);
+              const name = await decrypt(c.encrypted_name);
               const reminders = await Promise.all(
                 c.checklist_reminders.map(async (r: any) => {
                   try {
-                    const text = await decrypt(r.encrypted_text, r.data_hash || undefined);
-                    const completedStr = await decrypt(r.encrypted_completed, r.data_hash || undefined);
+                    const text = await decrypt(r.encrypted_text);
+                    const completedStr = await decrypt(r.encrypted_completed);
                     return {
                       id: r.id,
                       text,
