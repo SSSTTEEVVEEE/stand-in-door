@@ -67,36 +67,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="p-4 md:p-6 border-b flex items-center justify-center gap-8">
-        <button
-          onClick={() => setActiveView("chores")}
-          className={`p-3 rounded-lg transition-colors ${
-            activeView === "chores" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-          }`}
-          aria-label="Chores"
-        >
-          <ListTodo className="w-6 h-6" />
-        </button>
-        <button
-          onClick={() => setActiveView("checklists")}
-          className={`p-3 rounded-lg transition-colors ${
-            activeView === "checklists" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-          }`}
-          aria-label="Checklists"
-        >
-          <CheckSquare className="w-6 h-6" />
-        </button>
-        <button
-          onClick={() => setActiveView("calendar")}
-          className={`p-3 rounded-lg transition-colors ${
-            activeView === "calendar" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-          }`}
-          aria-label="Calendar"
-        >
-          <Calendar className="w-6 h-6" />
-        </button>
-      </header>
-
       <main className="flex-1 p-4 md:p-8">
         {activeView === "chores" && <ChoresSection />}
         {activeView === "checklists" && <ChecklistsSection />}
@@ -104,6 +74,35 @@ const Index = () => {
       </main>
 
       <footer className="p-4 md:p-6 border-t flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setActiveView("chores")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeView === "chores" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+            }`}
+            aria-label="Chores"
+          >
+            <ListTodo className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setActiveView("checklists")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeView === "checklists" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+            }`}
+            aria-label="Checklists"
+          >
+            <CheckSquare className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setActiveView("calendar")}
+            className={`p-2 rounded-lg transition-colors ${
+              activeView === "calendar" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+            }`}
+            aria-label="Calendar"
+          >
+            <Calendar className="w-5 h-5" />
+          </button>
+        </div>
         <div>
           <h1 className="text-2xl md:text-4xl font-bold">STAND</h1>
           <p className="text-muted-foreground text-xs tracking-widest uppercase">in the door</p>
