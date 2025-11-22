@@ -16,7 +16,6 @@ export type Database = {
     Tables: {
       calendar_events: {
         Row: {
-          created_at: string
           data_hash: string | null
           encrypted_created_at: string
           encrypted_date: string
@@ -27,7 +26,6 @@ export type Database = {
           pseudonym_id: string
         }
         Insert: {
-          created_at?: string
           data_hash?: string | null
           encrypted_created_at: string
           encrypted_date: string
@@ -38,7 +36,6 @@ export type Database = {
           pseudonym_id: string
         }
         Update: {
-          created_at?: string
           data_hash?: string | null
           encrypted_created_at?: string
           encrypted_date?: string
@@ -61,7 +58,6 @@ export type Database = {
       checklist_reminders: {
         Row: {
           checklist_id: string
-          created_at: string
           data_hash: string | null
           encrypted_completed: string
           encrypted_created_at: string
@@ -70,7 +66,6 @@ export type Database = {
         }
         Insert: {
           checklist_id: string
-          created_at?: string
           data_hash?: string | null
           encrypted_completed: string
           encrypted_created_at: string
@@ -79,7 +74,6 @@ export type Database = {
         }
         Update: {
           checklist_id?: string
-          created_at?: string
           data_hash?: string | null
           encrypted_completed?: string
           encrypted_created_at?: string
@@ -98,7 +92,6 @@ export type Database = {
       }
       checklists: {
         Row: {
-          created_at: string
           data_hash: string | null
           encrypted_created_at: string
           encrypted_name: string
@@ -106,7 +99,6 @@ export type Database = {
           pseudonym_id: string
         }
         Insert: {
-          created_at?: string
           data_hash?: string | null
           encrypted_created_at: string
           encrypted_name: string
@@ -114,7 +106,6 @@ export type Database = {
           pseudonym_id: string
         }
         Update: {
-          created_at?: string
           data_hash?: string | null
           encrypted_created_at?: string
           encrypted_name?: string
@@ -133,7 +124,6 @@ export type Database = {
       }
       chores: {
         Row: {
-          created_at: string
           data_hash: string | null
           encrypted_created_at: string
           encrypted_name: string
@@ -143,7 +133,6 @@ export type Database = {
           pseudonym_id: string
         }
         Insert: {
-          created_at?: string
           data_hash?: string | null
           encrypted_created_at: string
           encrypted_name: string
@@ -153,7 +142,6 @@ export type Database = {
           pseudonym_id: string
         }
         Update: {
-          created_at?: string
           data_hash?: string | null
           encrypted_created_at?: string
           encrypted_name?: string

@@ -115,24 +115,60 @@ export class EncryptionService {
     return decryptedString;
   }
 
+  // Export key for storage
+  static async exportKey(key: CryptoKey): Promise<string> {
+    const exported = await crypto.subtle.exportKey('raw', key);
+    return btoa(String.fromCharCode(...new Uint8Array(exported)));
+  }
+
+  // Import key from storage
+  static async importKey(keyData: string): Promise<CryptoKey> {
+    const keyBytes = new Uint8Array(
+      atob(keyData).split('').map(c => c.charCodeAt(0))
+    );
+    return await crypto.subtle.importKey(
+      'raw',
+      keyBytes,
+      { name: 'AES-GCM', length: KEY_LENGTH },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
   // Store encryption key in session storage (cleared on logout)
-  static storeKey(userId: string, key: CryptoKey): void {
+  static async storeKey(userId: string, key: CryptoKey): Promise<void> {
     try {
-      // We can't directly store CryptoKey, so we store a flag
+      const exportedKey = await this.exportKey(key);
+      sessionStorage.setItem(`enc_key_${userId}`, exportedKey);
       sessionStorage.setItem(`enc_session_${userId}`, 'active');
-      console.log('Encryption key session initialized for user:', userId);
+      console.log('Encryption key stored for user:', userId);
     } catch (error) {
-      console.error('Failed to store encryption session:', error);
-      throw new Error('Could not initialize encryption session');
+      console.error('Failed to store encryption key:', error);
+      throw new Error('Could not store encryption key');
+    }
+  }
+
+  static async retrieveKey(userId: string): Promise<CryptoKey | null> {
+    try {
+      const exportedKey = sessionStorage.getItem(`enc_key_${userId}`);
+      if (!exportedKey) {
+        console.log('No stored encryption key found for user:', userId);
+        return null;
+      }
+      return await this.importKey(exportedKey);
+    } catch (error) {
+      console.error('Failed to retrieve encryption key:', error);
+      return null;
     }
   }
 
   static clearKey(userId: string): void {
     try {
+      sessionStorage.removeItem(`enc_key_${userId}`);
       sessionStorage.removeItem(`enc_session_${userId}`);
-      console.log('Encryption key session cleared for user:', userId);
+      console.log('Encryption key cleared for user:', userId);
     } catch (error) {
-      console.error('Failed to clear encryption session:', error);
+      console.error('Failed to clear encryption key:', error);
     }
   }
 
