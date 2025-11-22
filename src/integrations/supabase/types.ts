@@ -245,7 +245,6 @@ export type Database = {
           created_at: string
           data_hash: string | null
           encrypted_email: string | null
-          encryption_salt: string
           id: string
           pseudonym_id: string
           updated_at: string
@@ -255,7 +254,6 @@ export type Database = {
           created_at?: string
           data_hash?: string | null
           encrypted_email?: string | null
-          encryption_salt: string
           id?: string
           pseudonym_id?: string
           updated_at?: string
@@ -265,7 +263,6 @@ export type Database = {
           created_at?: string
           data_hash?: string | null
           encrypted_email?: string | null
-          encryption_salt?: string
           id?: string
           pseudonym_id?: string
           updated_at?: string

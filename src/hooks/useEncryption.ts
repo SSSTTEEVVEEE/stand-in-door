@@ -16,10 +16,10 @@ export const useEncryption = () => {
         return;
       }
 
-      // Get user profile with salt and pseudonym
+      // Get user profile with pseudonym
       const { data: profile } = await supabase
         .from("profiles")
-        .select("encryption_salt, pseudonym_id")
+        .select("pseudonym_id")
         .eq("user_id", session.user.id)
         .single();
 
@@ -28,8 +28,7 @@ export const useEncryption = () => {
         
         // Check if key is in session
         if (EncryptionService.hasKey(session.user.id)) {
-          // In a real implementation, we'd need to properly restore the key
-          // For now, we'll prompt for password on page refresh
+          // Key is stored in memory
           setIsReady(true);
         } else {
           // Key not available - user needs to re-login
