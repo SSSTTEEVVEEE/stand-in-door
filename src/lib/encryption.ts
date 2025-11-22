@@ -136,69 +136,30 @@ export class EncryptionService {
     }
   }
 
-  // Store encryption key AND email in localStorage (persists across sessions)
-  static async storeKey(userId: string, key: CryptoKey, email?: string): Promise<void> {
-    try {
-      const exportedKey = await this.exportKey(key);
-      
-      localStorage.setItem(`enc_key_${userId}`, exportedKey);
-      localStorage.setItem(`enc_session_${userId}`, 'active');
-      
-      if (email) {
-        const normalizedEmail = email.toLowerCase().trim();
-        localStorage.setItem(`enc_email_${userId}`, normalizedEmail);
-      }
-    } catch (error) {
-      throw new Error('Could not store encryption key');
-    }
+  // Memory-only storage - keys never persisted to disk
+  // Keys are lost on page refresh for maximum security
+  static async storeKey(_userId: string, _key: CryptoKey, _email?: string): Promise<void> {
+    // No-op: Keys stored in memory only via EncryptionContext
+    // This ensures keys never touch localStorage/disk
   }
 
-  static async retrieveKey(userId: string): Promise<CryptoKey | null> {
-    try {
-      const exportedKey = localStorage.getItem(`enc_key_${userId}`);
-      
-      if (!exportedKey) {
-        return null;
-      }
-      
-      const key = await this.importKey(exportedKey);
-      const isValid = await this.validateKey(key);
-      
-      if (!isValid) {
-        this.clearKey(userId);
-        return null;
-      }
-      
-      return key;
-    } catch (error) {
-      this.clearKey(userId);
-      return null;
-    }
+  static async retrieveKey(_userId: string): Promise<CryptoKey | null> {
+    // Always return null - forces use of session memory storage
+    return null;
   }
 
-  static getStoredEmail(userId: string): string | null {
-    try {
-      return localStorage.getItem(`enc_email_${userId}`);
-    } catch (error) {
-      return null;
-    }
+  static getStoredEmail(_userId: string): string | null {
+    // Always return null - email not persisted
+    return null;
   }
 
-  static clearKey(userId: string): void {
-    try {
-      localStorage.removeItem(`enc_key_${userId}`);
-      localStorage.removeItem(`enc_session_${userId}`);
-      localStorage.removeItem(`enc_email_${userId}`);
-    } catch (error) {
-      // Silent fail
-    }
+  static clearKey(_userId: string): void {
+    // No-op: Nothing to clear from localStorage
+    // Memory is cleared via EncryptionContext
   }
 
-  static hasKey(userId: string): boolean {
-    try {
-      return localStorage.getItem(`enc_session_${userId}`) === 'active';
-    } catch (error) {
-      return false;
-    }
+  static hasKey(_userId: string): boolean {
+    // Always return false - check session memory instead
+    return false;
   }
 }
