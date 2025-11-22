@@ -137,11 +137,8 @@ const ChecklistsSection = () => {
 
     try {
       const now = new Date().toISOString();
-      const { encrypted: encryptedName, hash: nameHash } = await encrypt(newChecklistName);
-      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
-
-      const combinedData = `${newChecklistName}|${now}`;
-      const { hash: dataHash } = await encrypt(combinedData);
+      const { encrypted: encryptedName } = await encrypt(newChecklistName);
+      const { encrypted: encryptedCreatedAt } = await encrypt(now);
 
       const { data, error } = await supabase
         .from("checklists")
@@ -149,7 +146,6 @@ const ChecklistsSection = () => {
           pseudonym_id: pseudonymId,
           encrypted_name: encryptedName,
           encrypted_created_at: encryptedCreatedAt,
-          data_hash: dataHash,
         })
         .select()
         .single();
@@ -190,12 +186,9 @@ const ChecklistsSection = () => {
 
     try {
       const now = new Date().toISOString();
-      const { encrypted: encryptedText, hash: textHash } = await encrypt(newReminderText);
-      const { encrypted: encryptedCompleted, hash: completedHash } = await encrypt("false");
-      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
-
-      const combinedData = `${newReminderText}|false|${now}`;
-      const { hash: dataHash } = await encrypt(combinedData);
+      const { encrypted: encryptedText } = await encrypt(newReminderText);
+      const { encrypted: encryptedCompleted } = await encrypt("false");
+      const { encrypted: encryptedCreatedAt } = await encrypt(now);
 
       const { data, error } = await supabase
         .from("checklist_reminders")
@@ -204,7 +197,6 @@ const ChecklistsSection = () => {
           encrypted_text: encryptedText,
           encrypted_completed: encryptedCompleted,
           encrypted_created_at: encryptedCreatedAt,
-          data_hash: dataHash,
         })
         .select()
         .single();
@@ -253,13 +245,12 @@ const ChecklistsSection = () => {
 
     try {
       const newCompleted = !reminder.completed;
-      const { encrypted: encryptedCompleted, hash } = await encrypt(newCompleted.toString());
+      const { encrypted: encryptedCompleted } = await encrypt(newCompleted.toString());
       
       const { error } = await supabase
         .from("checklist_reminders")
         .update({ 
-          encrypted_completed: encryptedCompleted,
-          data_hash: hash 
+          encrypted_completed: encryptedCompleted
         })
         .eq("id", reminderId);
 
@@ -290,7 +281,7 @@ const ChecklistsSection = () => {
     if (!checklist) return;
 
     try {
-      const { encrypted: encryptedCompleted, hash } = await encrypt("false");
+      const { encrypted: encryptedCompleted } = await encrypt("false");
       
       // Reset all reminders to incomplete
       await Promise.all(
@@ -298,8 +289,7 @@ const ChecklistsSection = () => {
           supabase
             .from("checklist_reminders")
             .update({ 
-              encrypted_completed: encryptedCompleted,
-              data_hash: hash 
+              encrypted_completed: encryptedCompleted
             })
             .eq("id", reminder.id)
         )
@@ -350,13 +340,12 @@ const ChecklistsSection = () => {
     }
 
     try {
-      const { encrypted: encryptedText, hash } = await encrypt(editText);
+      const { encrypted: encryptedText } = await encrypt(editText);
       
       const { error } = await supabase
         .from("checklist_reminders")
         .update({ 
-          encrypted_text: encryptedText,
-          data_hash: hash 
+          encrypted_text: encryptedText
         })
         .eq("id", reminderId);
 

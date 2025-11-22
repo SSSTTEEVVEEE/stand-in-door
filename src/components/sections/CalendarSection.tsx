@@ -203,7 +203,6 @@ const CalendarSection = () => {
       const { encrypted: encTime } = await encrypt(newEvent.time);
       const { encrypted: encDesc } = await encrypt(newEvent.description || "");
       const { encrypted: encCreated } = await encrypt(now);
-      const { hash: dataHash } = await encrypt(`${newEvent.title}|${newEvent.date}|${newEvent.time}`);
 
       const { data, error } = await supabase
         .from("calendar_events")
@@ -214,7 +213,6 @@ const CalendarSection = () => {
           encrypted_time: encTime,
           encrypted_description: encDesc,
           encrypted_created_at: encCreated,
-          data_hash: dataHash,
         })
         .select()
         .single();
@@ -264,7 +262,6 @@ const CalendarSection = () => {
       const { encrypted: encTime } = await encrypt(newEvent.time);
       const { encrypted: encDesc } = await encrypt(newEvent.description || "");
       const { encrypted: encCreated } = await encrypt(now);
-      const { hash: dataHash } = await encrypt(`${newEvent.title}|${newEvent.date}|${newEvent.time}`);
 
       const { error } = await supabase
         .from("calendar_events")
@@ -274,7 +271,6 @@ const CalendarSection = () => {
           encrypted_time: encTime,
           encrypted_description: encDesc,
           encrypted_created_at: encCreated,
-          data_hash: dataHash,
         })
         .eq("id", editingEvent.id);
 
