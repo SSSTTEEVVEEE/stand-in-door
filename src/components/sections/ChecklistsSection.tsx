@@ -7,17 +7,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
+import { Pencil, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Reminder {
   id: string;
   text: string;
   completed: boolean;
+  isOneOff?: boolean;
 }
 
 interface Checklist {
   id: string;
   name: string;
   reminders: Reminder[];
+  isComplete: boolean;
 }
 
 const ChecklistsSection = () => {
@@ -28,6 +31,9 @@ const ChecklistsSection = () => {
   const [newReminderText, setNewReminderText] = useState("");
   const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [expandedChecklists, setExpandedChecklists] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadChecklists();
@@ -59,20 +65,21 @@ const ChecklistsSection = () => {
                       id: r.id,
                       text,
                       completed: completedStr === "true",
+                      isOneOff: false,
                     };
                   } catch (error) {
-                    console.error("Error decrypting reminder:", error);
                     return null;
                   }
                 })
               );
+              const validReminders = reminders.filter((r) => r !== null) as Reminder[];
               return {
                 id: c.id,
                 name,
-                reminders: reminders.filter((r) => r !== null) as Reminder[],
+                reminders: validReminders,
+                isComplete: validReminders.length > 0 && validReminders.every(r => r.completed),
               };
             } catch (error) {
-              console.error("Error decrypting checklist:", error);
               return null;
             }
           })
@@ -80,7 +87,7 @@ const ChecklistsSection = () => {
         setChecklists(decryptedChecklists.filter((c) => c !== null) as Checklist[]);
       }
     } catch (error) {
-      console.error("Error loading checklists:", error);
+      // Error loading checklists
     } finally {
       setLoading(false);
     }
@@ -101,7 +108,6 @@ const ChecklistsSection = () => {
       const { encrypted: encryptedName, hash: nameHash } = await encrypt(newChecklistName);
       const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
 
-      // Combined data hash
       const combinedData = `${newChecklistName}|${now}`;
       const { hash: dataHash } = await encrypt(combinedData);
 
@@ -122,13 +128,14 @@ const ChecklistsSection = () => {
         id: data.id,
         name: newChecklistName,
         reminders: [],
+        isComplete: false,
       };
 
       setChecklists([...checklists, newChecklist]);
       setNewChecklistName("");
       toast({
         title: "Checklist Created",
-        description: `${newChecklist.name} is ready for deployment`,
+        description: `${newChecklist.name} is ready`,
       });
     } catch (error: any) {
       toast({
@@ -139,11 +146,11 @@ const ChecklistsSection = () => {
     }
   };
 
-  const addReminder = async (checklistId: string) => {
+  const addReminder = async (checklistId: string, isOneOff: boolean = false) => {
     if (!newReminderText.trim()) {
       toast({
         title: "Invalid Input",
-        description: "Reminder text cannot be empty",
+        description: "Task text cannot be empty",
         variant: "destructive",
       });
       return;
@@ -155,7 +162,6 @@ const ChecklistsSection = () => {
       const { encrypted: encryptedCompleted, hash: completedHash } = await encrypt("false");
       const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
 
-      // Combined data hash
       const combinedData = `${newReminderText}|false|${now}`;
       const { hash: dataHash } = await encrypt(combinedData);
 
@@ -175,16 +181,19 @@ const ChecklistsSection = () => {
 
       setChecklists(checklists.map(checklist => {
         if (checklist.id === checklistId) {
+          const newReminders = [
+            ...checklist.reminders,
+            {
+              id: data.id,
+              text: newReminderText,
+              completed: false,
+              isOneOff,
+            }
+          ];
           return {
             ...checklist,
-            reminders: [
-              ...checklist.reminders,
-              {
-                id: data.id,
-                text: newReminderText,
-                completed: false,
-              }
-            ]
+            reminders: newReminders,
+            isComplete: false,
           };
         }
         return checklist;
@@ -192,8 +201,8 @@ const ChecklistsSection = () => {
 
       setNewReminderText("");
       toast({
-        title: "Reminder Added",
-        description: "Task added to checklist",
+        title: "Task Added",
+        description: isOneOff ? "One-off task added" : "Recurring task added",
       });
     } catch (error: any) {
       toast({
@@ -226,19 +235,127 @@ const ChecklistsSection = () => {
 
       setChecklists(checklists.map(checklist => {
         if (checklist.id === checklistId) {
+          const newReminders = checklist.reminders.map(reminder =>
+            reminder.id === reminderId
+              ? { ...reminder, completed: newCompleted }
+              : reminder
+          );
+          return {
+            ...checklist,
+            reminders: newReminders,
+            isComplete: newReminders.length > 0 && newReminders.every(r => r.completed),
+          };
+        }
+        return checklist;
+      }));
+    } catch (error) {
+      // Error updating reminder
+    }
+  };
+
+  const completeAllAndReset = async (checklistId: string) => {
+    const checklist = checklists.find(c => c.id === checklistId);
+    if (!checklist) return;
+
+    try {
+      const { encrypted: encryptedCompleted, hash } = await encrypt("false");
+      
+      // Reset all reminders to incomplete
+      await Promise.all(
+        checklist.reminders.map(reminder =>
+          supabase
+            .from("checklist_reminders")
+            .update({ 
+              encrypted_completed: encryptedCompleted,
+              data_hash: hash 
+            })
+            .eq("id", reminder.id)
+        )
+      );
+
+      setChecklists(checklists.map(c => {
+        if (c.id === checklistId) {
+          return {
+            ...c,
+            reminders: c.reminders.map(r => ({ ...r, completed: false })),
+            isComplete: false,
+          };
+        }
+        return c;
+      }));
+
+      toast({
+        title: "Checklist Reset",
+        description: "All tasks marked incomplete",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const startEditingReminder = (reminderId: string, currentText: string) => {
+    setEditingReminderId(reminderId);
+    setEditText(currentText);
+  };
+
+  const cancelEditingReminder = () => {
+    setEditingReminderId(null);
+    setEditText("");
+  };
+
+  const saveEditedReminder = async (checklistId: string, reminderId: string) => {
+    if (!editText.trim()) {
+      toast({
+        title: "Invalid Input",
+        description: "Task text cannot be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { encrypted: encryptedText, hash } = await encrypt(editText);
+      
+      const { error } = await supabase
+        .from("checklist_reminders")
+        .update({ 
+          encrypted_text: encryptedText,
+          data_hash: hash 
+        })
+        .eq("id", reminderId);
+
+      if (error) throw error;
+
+      setChecklists(checklists.map(checklist => {
+        if (checklist.id === checklistId) {
           return {
             ...checklist,
             reminders: checklist.reminders.map(reminder =>
               reminder.id === reminderId
-                ? { ...reminder, completed: newCompleted }
+                ? { ...reminder, text: editText }
                 : reminder
             )
           };
         }
         return checklist;
       }));
-    } catch (error) {
-      console.error("Error updating reminder:", error);
+
+      setEditingReminderId(null);
+      setEditText("");
+      toast({
+        title: "Task Updated",
+        description: "Changes saved",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -254,7 +371,7 @@ const ChecklistsSection = () => {
       setChecklists(checklists.filter(c => c.id !== checklistId));
       toast({
         title: "Checklist Removed",
-        description: "Operation deleted from system",
+        description: "Operation deleted",
       });
     } catch (error: any) {
       toast({
@@ -265,8 +382,20 @@ const ChecklistsSection = () => {
     }
   };
 
+  const toggleExpanded = (checklistId: string) => {
+    setExpandedChecklists(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(checklistId)) {
+        newSet.delete(checklistId);
+      } else {
+        newSet.add(checklistId);
+      }
+      return newSet;
+    });
+  };
+
   if (loading) {
-    return <div className="text-center p-8">Loading...</div>;
+    return <div className="text-center p-8">LOADING...</div>;
   }
 
   return (
@@ -294,62 +423,149 @@ const ChecklistsSection = () => {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {checklists.map((checklist) => (
-          <Card key={checklist.id} className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold">{checklist.name}</h3>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => deleteChecklist(checklist.id)}
+        {checklists.map((checklist) => {
+          const isExpanded = expandedChecklists.has(checklist.id) || !checklist.isComplete;
+          
+          return (
+            <Card key={checklist.id} className="p-6">
+              <div 
+                className="flex items-center justify-between mb-4 cursor-pointer"
+                onClick={() => checklist.isComplete && toggleExpanded(checklist.id)}
               >
-                DELETE
-              </Button>
-            </div>
-
-            <div className="space-y-2 mb-4">
-              {checklist.reminders.map((reminder) => (
-                <div key={reminder.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded">
-                  <Checkbox
-                    checked={reminder.completed}
-                    onCheckedChange={() => toggleReminder(checklist.id, reminder.id)}
-                  />
-                  <span className={reminder.completed ? "line-through text-muted-foreground" : ""}>
-                    {reminder.text}
-                  </span>
+                <div className="flex items-center gap-2 flex-1">
+                  <h3 className="text-xl font-bold">{checklist.name}</h3>
+                  {checklist.isComplete && (
+                    <button>
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteChecklist(checklist.id);
+                  }}
+                >
+                  DELETE
+                </Button>
+              </div>
 
-            <div className="flex gap-2">
-              <Input
-                value={selectedChecklistId === checklist.id ? newReminderText : ""}
-                onChange={(e) => {
-                  setSelectedChecklistId(checklist.id);
-                  setNewReminderText(e.target.value);
-                }}
-                placeholder="Add reminder..."
-                className="font-mono text-sm"
-              />
-              <Button
-                size="sm"
-                onClick={() => addReminder(checklist.id)}
-                className="font-bold"
-              >
-                ADD
-              </Button>
-            </div>
+              {isExpanded && (
+                <>
+                  <div className="space-y-2 mb-4">
+                    {checklist.reminders.map((reminder) => (
+                      <div key={reminder.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded">
+                        <Checkbox
+                          checked={reminder.completed}
+                          onCheckedChange={() => toggleReminder(checklist.id, reminder.id)}
+                        />
+                        {editingReminderId === reminder.id ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              className="flex-1"
+                              autoFocus
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => saveEditedReminder(checklist.id, reminder.id)}
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={cancelEditingReminder}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className={`flex-1 ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
+                              {reminder.text}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => startEditingReminder(reminder.id, reminder.text)}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
-            <p className="text-xs text-muted-foreground mt-2">
-              {checklist.reminders.filter(r => r.completed).length} / {checklist.reminders.length} complete
-            </p>
-          </Card>
-        ))}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={selectedChecklistId === checklist.id ? newReminderText : ""}
+                        onChange={(e) => {
+                          setSelectedChecklistId(checklist.id);
+                          setNewReminderText(e.target.value);
+                        }}
+                        placeholder="Add recurring task..."
+                        className="font-mono text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => addReminder(checklist.id, false)}
+                        className="font-bold"
+                      >
+                        ADD
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={selectedChecklistId === checklist.id ? newReminderText : ""}
+                        onChange={(e) => {
+                          setSelectedChecklistId(checklist.id);
+                          setNewReminderText(e.target.value);
+                        }}
+                        placeholder="Add one-off task..."
+                        className="font-mono text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => addReminder(checklist.id, true)}
+                        className="font-bold"
+                      >
+                        ONE-OFF
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-xs text-muted-foreground">
+                      {checklist.reminders.filter(r => r.completed).length} / {checklist.reminders.length} complete
+                    </p>
+                    {checklist.isComplete && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => completeAllAndReset(checklist.id)}
+                      >
+                        RESET ALL
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
       {checklists.length === 0 && (
         <Card className="p-12 text-center">
-          <p className="text-muted-foreground">No checklists deployed. Create your first operation above.</p>
+          <p className="text-muted-foreground">No checklists created. Create your first operation above.</p>
         </Card>
       )}
     </div>

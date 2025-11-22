@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChoresSection from "@/components/sections/ChoresSection";
 import ChecklistsSection from "@/components/sections/ChecklistsSection";
 import CalendarSection from "@/components/sections/CalendarSection";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { EncryptionService } from "@/lib/encryption";
+import { ListTodo, CheckSquare, Calendar, User as UserIcon } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState<"chores" | "checklists" | "calendar">("chores");
 
   useEffect(() => {
     console.log('[Index] Initializing authentication check...');
@@ -66,42 +66,52 @@ const Index = () => {
 
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl md:text-6xl font-bold">STAND</h1>
-          <p className="text-muted-foreground text-xs tracking-widest uppercase">in the door</p>
-        </div>
-        <Button variant="outline" size="sm" className="font-bold" onClick={handleLogout}>
-          LOGOUT
-        </Button>
+    <div className="min-h-screen flex flex-col">
+      <header className="p-4 md:p-6 border-b flex items-center justify-center gap-8">
+        <button
+          onClick={() => setActiveView("chores")}
+          className={`p-3 rounded-lg transition-colors ${
+            activeView === "chores" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+          }`}
+          aria-label="Chores"
+        >
+          <ListTodo className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setActiveView("checklists")}
+          className={`p-3 rounded-lg transition-colors ${
+            activeView === "checklists" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+          }`}
+          aria-label="Checklists"
+        >
+          <CheckSquare className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setActiveView("calendar")}
+          className={`p-3 rounded-lg transition-colors ${
+            activeView === "calendar" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+          }`}
+          aria-label="Calendar"
+        >
+          <Calendar className="w-6 h-6" />
+        </button>
       </header>
 
-      <Tabs defaultValue="chores" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3 mb-8">
-          <TabsTrigger value="chores" className="font-bold">
-            CHORES
-          </TabsTrigger>
-          <TabsTrigger value="checklists" className="font-bold">
-            CHECKLISTS
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="font-bold">
-            CALENDAR
-          </TabsTrigger>
-        </TabsList>
+      <main className="flex-1 p-4 md:p-8">
+        {activeView === "chores" && <ChoresSection />}
+        {activeView === "checklists" && <ChecklistsSection />}
+        {activeView === "calendar" && <CalendarSection />}
+      </main>
 
-        <TabsContent value="chores">
-          <ChoresSection />
-        </TabsContent>
-
-        <TabsContent value="checklists">
-          <ChecklistsSection />
-        </TabsContent>
-
-        <TabsContent value="calendar">
-          <CalendarSection />
-        </TabsContent>
-      </Tabs>
+      <footer className="p-4 md:p-6 border-t flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-bold">STAND</h1>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">in the door</p>
+        </div>
+        <Button variant="outline" size="icon" onClick={handleLogout} aria-label="Logout">
+          <UserIcon className="w-5 h-5" />
+        </Button>
+      </footer>
     </div>
   );
 };

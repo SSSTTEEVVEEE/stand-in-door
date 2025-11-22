@@ -146,7 +146,24 @@ const ChoresSection = () => {
     setProgress(0);
     setResults(null);
 
-    const DAYS_TOTAL = 228;
+    // Delete existing calendar events from chores
+    try {
+      const { data: existingEvents } = await supabase
+        .from("calendar_events")
+        .select("id")
+        .eq("pseudonym_id", pseudonymId);
+      
+      if (existingEvents && existingEvents.length > 0) {
+        await supabase
+          .from("calendar_events")
+          .delete()
+          .eq("pseudonym_id", pseudonymId);
+      }
+    } catch (error) {
+      // Continue with optimization
+    }
+
+    const DAYS_TOTAL = 84;
     const SAMPLE_SIZE = 20000;
 
     const computeSchedule = (offsets: Record<string, number>) => {
@@ -195,8 +212,50 @@ const ChoresSection = () => {
     }
 
     setResults(best[0]);
-    setIsOptimizing(false);
     setProgress(100);
+
+    // Generate calendar events
+    try {
+      const today = new Date();
+      const calendarEvents = [];
+      
+      for (const chore of chores) {
+        let currentDate = new Date(today);
+        currentDate.setDate(currentDate.getDate() + (best[0].offsets[chore.name] || 0));
+        
+        while (currentDate <= new Date(today.getTime() + DAYS_TOTAL * 24 * 60 * 60 * 1000)) {
+          const eventDate = currentDate.toISOString().split('T')[0];
+          const eventTime = "09:00";
+          
+          const { encrypted: encTitle } = await encrypt(chore.name);
+          const { encrypted: encDate } = await encrypt(eventDate);
+          const { encrypted: encTime } = await encrypt(eventTime);
+          const { encrypted: encDesc } = await encrypt(`Recurring chore (every ${chore.period} days)`);
+          const { encrypted: encCreated } = await encrypt(new Date().toISOString());
+          const { hash: dataHash } = await encrypt(`${chore.name}|${eventDate}|${eventTime}`);
+          
+          calendarEvents.push({
+            pseudonym_id: pseudonymId,
+            encrypted_title: encTitle,
+            encrypted_date: encDate,
+            encrypted_time: encTime,
+            encrypted_description: encDesc,
+            encrypted_created_at: encCreated,
+            data_hash: dataHash,
+          });
+          
+          currentDate = new Date(currentDate.getTime() + chore.period * 24 * 60 * 60 * 1000);
+        }
+      }
+      
+      if (calendarEvents.length > 0) {
+        await supabase.from("calendar_events").insert(calendarEvents);
+      }
+    } catch (error) {
+      // Error creating calendar events
+    }
+
+    setIsOptimizing(false);
 
     toast({
       title: "Optimization Complete",
