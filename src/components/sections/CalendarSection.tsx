@@ -232,58 +232,93 @@ const CalendarSection = () => {
 
   const renderMonthView = () => {
     const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth();
-    const days = [];
-    const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const weekDays = ["M", "T", "W", "Th", "F", "Sa", "Su"];
+    const allDays = [];
 
-    // Add empty cells for days before the month starts
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(<div key={`empty-${i}`} className="aspect-square border border-border/50 bg-muted/20" />);
+    // Calculate days from previous month to show
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+    
+    // Add days from previous month
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+      const day = daysInPrevMonth - i;
+      allDays.push({
+        day,
+        date: new Date(prevYear, prevMonth, day),
+        isCurrentMonth: false,
+      });
     }
 
-    // Add cells for each day of the month
+    // Add days of current month
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dayEvents = getEventsForDate(date);
-      const isToday = date.toDateString() === new Date().toDateString();
+      allDays.push({
+        day,
+        date: new Date(year, month, day),
+        isCurrentMonth: true,
+      });
+    }
 
-      days.push(
-        <div
-          key={day}
-          className={`aspect-square border border-border/50 p-2 bg-background hover:bg-muted/50 transition-colors ${
-            isToday ? "border-primary border-2" : ""
-          }`}
-        >
-          <div className={`text-sm font-bold mb-1 ${isToday ? "text-primary" : ""}`}>{day}</div>
-          <div className="space-y-1 overflow-hidden">
-            {dayEvents.slice(0, 3).map((event) => (
-              <div
-                key={event.id}
-                className="text-xs px-1 py-0.5 bg-primary/20 rounded truncate cursor-pointer hover:bg-primary/30"
-                onClick={() => deleteEvent(event.id)}
-                title={`${event.time} - ${event.title} (Click to delete)`}
-              >
-                {event.time} {event.title}
-              </div>
-            ))}
-            {dayEvents.length > 3 && (
-              <div className="text-xs text-muted-foreground">+{dayEvents.length - 3} more</div>
-            )}
-          </div>
-        </div>
-      );
+    // Add days from next month to fill the grid (6 rows * 7 days = 42 cells)
+    const remainingCells = 42 - allDays.length;
+    for (let day = 1; day <= remainingCells; day++) {
+      const nextMonth = month === 11 ? 0 : month + 1;
+      const nextYear = month === 11 ? year + 1 : year;
+      allDays.push({
+        day,
+        date: new Date(nextYear, nextMonth, day),
+        isCurrentMonth: false,
+      });
     }
 
     return (
-      <div className="space-y-2">
-        <div className="grid grid-cols-7 gap-0">
+      <div className="flex flex-col h-full">
+        {/* Header row */}
+        <div className="grid grid-cols-7 border-b border-border">
           {weekDays.map((day) => (
-            <div key={day} className="text-center font-bold text-sm py-2 border-b border-border">
+            <div key={day} className="text-center font-bold text-sm py-2 border-r border-border last:border-r-0">
               {day}
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-0 border border-border">
-          {days}
+        {/* Calendar grid - 6 rows */}
+        <div className="flex-1 grid grid-rows-6">
+          {Array.from({ length: 6 }).map((_, rowIdx) => (
+            <div key={rowIdx} className="grid grid-cols-7 border-b border-border last:border-b-0">
+              {allDays.slice(rowIdx * 7, (rowIdx + 1) * 7).map((dayObj, colIdx) => {
+                const dayEvents = getEventsForDate(dayObj.date);
+                const isToday = dayObj.date.toDateString() === new Date().toDateString();
+                
+                return (
+                  <div
+                    key={`${rowIdx}-${colIdx}`}
+                    className={`border-r border-border last:border-r-0 p-2 ${
+                      dayObj.isCurrentMonth ? "bg-background" : "bg-muted/20"
+                    } ${isToday ? "bg-primary/10" : ""} hover:bg-muted/50 transition-colors`}
+                  >
+                    <div className={`text-sm font-bold mb-1 ${isToday ? "text-primary" : ""} ${!dayObj.isCurrentMonth ? "text-muted-foreground" : ""}`}>
+                      {dayObj.day}
+                    </div>
+                    <div className="space-y-1 overflow-hidden">
+                      {dayEvents.slice(0, 2).map((event) => (
+                        <div
+                          key={event.id}
+                          className="text-xs px-1 py-0.5 bg-primary/20 rounded truncate cursor-pointer hover:bg-primary/30"
+                          onClick={() => deleteEvent(event.id)}
+                          title={`${event.time} - ${event.title} (Click to delete)`}
+                        >
+                          {event.time} {event.title}
+                        </div>
+                      ))}
+                      {dayEvents.length > 2 && (
+                        <div className="text-xs text-muted-foreground">+{dayEvents.length - 2}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -300,68 +335,128 @@ const CalendarSection = () => {
       weekDays.push(date);
     }
 
-    return (
-      <div className="grid grid-cols-7 gap-2">
-        {weekDays.map((date) => {
-          const dayEvents = getEventsForDate(date);
-          const isToday = date.toDateString() === new Date().toDateString();
+    const hours = Array.from({ length: 24 }, (_, i) => i);
 
-          return (
-            <Card key={date.toISOString()} className={`p-3 ${isToday ? "border-primary border-2" : ""}`}>
-              <div className="text-center mb-2">
-                <div className="text-xs text-muted-foreground">{date.toLocaleDateString("en-US", { weekday: "short" })}</div>
-                <div className={`text-lg font-bold ${isToday ? "text-primary" : ""}`}>{date.getDate()}</div>
+    return (
+      <div className="flex h-full">
+        {/* Time column */}
+        <div className="w-20 border-r border-border">
+          <div className="h-16 border-b border-border" /> {/* Header spacing */}
+          <ScrollArea className="h-[calc(100%-4rem)]">
+            {hours.map((hour) => (
+              <div key={hour} className="h-16 border-b border-border/50 px-2 py-1 text-xs text-muted-foreground">
+                {`${hour.toString().padStart(2, "0")}:00`}
               </div>
-              <div className="space-y-2">
-                {dayEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="text-xs p-2 bg-primary/20 rounded cursor-pointer hover:bg-primary/30"
-                    onClick={() => deleteEvent(event.id)}
-                    title="Click to delete"
-                  >
-                    <div className="font-bold">{event.time}</div>
-                    <div className="truncate">{event.title}</div>
+            ))}
+          </ScrollArea>
+        </div>
+
+        {/* Days grid */}
+        <div className="flex-1 overflow-hidden">
+          {/* Header */}
+          <div className="h-16 border-b border-border grid grid-cols-7">
+            {weekDays.map((date) => {
+              const isToday = date.toDateString() === new Date().toDateString();
+              return (
+                <div key={date.toISOString()} className={`text-center border-r border-border last:border-r-0 py-2 ${isToday ? "bg-primary/10" : ""}`}>
+                  <div className="text-xs text-muted-foreground uppercase">
+                    {date.toLocaleDateString("en-US", { weekday: "short" })}
                   </div>
-                ))}
-              </div>
-            </Card>
-          );
-        })}
+                  <div className={`text-lg font-bold ${isToday ? "text-primary" : ""}`}>
+                    {date.getDate()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Events grid */}
+          <ScrollArea className="h-[calc(100%-4rem)]">
+            <div className="grid grid-cols-7">
+              {weekDays.map((date) => {
+                const dayEvents = getEventsForDate(date);
+                
+                return (
+                  <div key={date.toISOString()} className="border-r border-border last:border-r-0">
+                    {hours.map((hour) => {
+                      const hourEvents = dayEvents.filter((e) => parseInt(e.time.split(":")[0]) === hour);
+                      
+                      return (
+                        <div key={hour} className="h-16 border-b border-border/50 p-1">
+                          {hourEvents.map((event) => (
+                            <div
+                              key={event.id}
+                              className="text-xs p-1 bg-primary/20 rounded cursor-pointer hover:bg-primary/30 truncate"
+                              onClick={() => deleteEvent(event.id)}
+                              title={`${event.time} - ${event.title} (Click to delete)`}
+                            >
+                              <div className="font-bold">{event.time}</div>
+                              <div className="truncate">{event.title}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </div>
       </div>
     );
   };
 
   const renderDayView = () => {
-    const dayEvents = getEventsForDate(currentDate);
-    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const { daysInMonth, year, month } = getDaysInMonth();
+    const daysInCurrentMonth = [];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      daysInCurrentMonth.push(date);
+    }
 
     return (
-      <ScrollArea className="h-[600px]">
-        <div className="space-y-1">
-          {hours.map((hour) => {
-            const hourEvents = dayEvents.filter((e) => parseInt(e.time.split(":")[0]) === hour);
-            const timeLabel = `${hour.toString().padStart(2, "0")}:00`;
+      <ScrollArea className="h-full">
+        <div className="space-y-4 p-4">
+          {daysInCurrentMonth.map((date) => {
+            const dayEvents = getEventsForDate(date);
+            const isToday = date.toDateString() === new Date().toDateString();
+            const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+            const dayNumber = date.getDate();
 
             return (
-              <div key={hour} className="flex border-t border-border/50">
-                <div className="w-20 text-sm text-muted-foreground p-2">{timeLabel}</div>
-                <div className="flex-1 min-h-[60px] p-2 space-y-1">
-                  {hourEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="p-2 bg-primary/20 rounded cursor-pointer hover:bg-primary/30"
-                      onClick={() => deleteEvent(event.id)}
-                      title="Click to delete"
-                    >
-                      <div className="font-bold">{event.time} - {event.title}</div>
-                      {event.description && (
-                        <div className="text-xs text-muted-foreground mt-1">{event.description}</div>
-                      )}
-                    </div>
-                  ))}
+              <Card key={date.toISOString()} className={`p-4 ${isToday ? "border-primary border-2" : ""}`}>
+                <div className="flex gap-4">
+                  <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4">
+                    <div className="text-sm text-muted-foreground uppercase">{dayName}</div>
+                    <div className={`text-3xl font-bold ${isToday ? "text-primary" : ""}`}>{dayNumber}</div>
+                  </div>
+                  <div className="flex-1">
+                    {dayEvents.length > 0 ? (
+                      <div className="space-y-2">
+                        {dayEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className="p-3 bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20 transition-colors"
+                            onClick={() => deleteEvent(event.id)}
+                            title="Click to delete"
+                          >
+                            <div className="font-bold">{event.time} - {event.title}</div>
+                            {event.description && (
+                              <div className="text-sm text-muted-foreground mt-1">{event.description}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                        No events scheduled. Click + to add an event for this day.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
@@ -402,131 +497,126 @@ const CalendarSection = () => {
   }
 
   return (
-    <div className="space-y-4">
-      {/* View selector */}
-      <ScrollArea className="w-full whitespace-nowrap">
-        <div className="flex gap-2 pb-2">
-          <Button
-            variant={viewType === "day" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("day")}
-            className="font-bold"
-          >
-            DAY
-          </Button>
-          <Button
-            variant={viewType === "week" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("week")}
-            className="font-bold"
-          >
-            WEEK
-          </Button>
-          <Button
-            variant={viewType === "month" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("month")}
-            className="font-bold"
-          >
-            MONTH
-          </Button>
-          <Button
-            variant={viewType === "year" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewType("year")}
-            className="font-bold"
-          >
-            YEAR
-          </Button>
-        </div>
-      </ScrollArea>
-
-      {/* Calendar header */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => navigateDate("prev")}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <h2 className="text-2xl font-bold">{getDateRangeText()}</h2>
-            <Button variant="outline" size="icon" onClick={() => navigateDate("next")}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" onClick={() => setCurrentDate(new Date())}>
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      {/* View options with navigation and add button */}
+      <div className="flex items-center justify-between gap-2 px-4 py-2 border-b">
+        <Button variant="ghost" size="icon" onClick={() => navigateDate("prev")}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        
+        <ScrollArea className="flex-1 whitespace-nowrap">
+          <div className="flex items-center justify-center gap-2">
+            <h2 className="text-xl font-bold">{getDateRangeText()}</h2>
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
               TODAY
             </Button>
           </div>
+        </ScrollArea>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="font-bold">
-                <Plus className="w-4 h-4 mr-2" />
-                NEW EVENT
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Schedule New Event</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="eventTitle">Title</Label>
-                  <Input
-                    id="eventTitle"
-                    value={newEvent.title}
-                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    placeholder="Event title"
-                    className="font-mono"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="eventDate">Date</Label>
-                    <Input
-                      id="eventDate"
-                      type="date"
-                      value={newEvent.date}
-                      onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                      className="font-mono"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="eventTime">Time</Label>
-                    <Input
-                      id="eventTime"
-                      type="time"
-                      value={newEvent.time}
-                      onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                      className="font-mono"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="eventDescription">Description (Optional)</Label>
-                  <Textarea
-                    id="eventDescription"
-                    value={newEvent.description}
-                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    placeholder="Event details..."
-                    className="font-mono"
-                  />
-                </div>
-                <Button onClick={addEvent} className="w-full font-bold">
-                  SCHEDULE EVENT
-                </Button>
+        <Button variant="ghost" size="icon" onClick={() => navigateDate("next")}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="icon" className="ml-2">
+              <Plus className="w-4 h-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Schedule New Event</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="eventTitle">Title</Label>
+                <Input
+                  id="eventTitle"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  placeholder="Event title"
+                  className="font-mono"
+                />
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </Card>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="eventDate">Date</Label>
+                  <Input
+                    id="eventDate"
+                    type="date"
+                    value={newEvent.date}
+                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    className="font-mono"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="eventTime">Time</Label>
+                  <Input
+                    id="eventTime"
+                    type="time"
+                    value={newEvent.time}
+                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="eventDescription">Description (Optional)</Label>
+                <Textarea
+                  id="eventDescription"
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  placeholder="Event details..."
+                  className="font-mono"
+                />
+              </div>
+              <Button onClick={addEvent} className="w-full font-bold">
+                SCHEDULE EVENT
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {/* Calendar view */}
-      <Card className="p-4">
+      <div className="flex-1 overflow-hidden">
         {viewType === "month" && renderMonthView()}
         {viewType === "week" && renderWeekView()}
         {viewType === "day" && renderDayView()}
         {viewType === "year" && renderYearView()}
-      </Card>
+      </div>
+
+      {/* Footer with view selector */}
+      <div className="flex items-center justify-center gap-2 p-2 border-t bg-background">
+        <Button
+          variant={viewType === "day" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewType("day")}
+        >
+          DAY
+        </Button>
+        <Button
+          variant={viewType === "week" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewType("week")}
+        >
+          WEEK
+        </Button>
+        <Button
+          variant={viewType === "month" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewType("month")}
+        >
+          MONTH
+        </Button>
+        <Button
+          variant={viewType === "year" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewType("year")}
+        >
+          YEAR
+        </Button>
+      </div>
     </div>
   );
 };
