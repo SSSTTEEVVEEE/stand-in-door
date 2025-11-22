@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CalendarEvent {
@@ -49,6 +49,18 @@ const CalendarSection = () => {
   useEffect(() => {
     loadEvents();
   }, []);
+
+  // Scroll to today in day view
+  useEffect(() => {
+    if (viewType === "day") {
+      setTimeout(() => {
+        const todayCard = document.getElementById("today-card");
+        if (todayCard) {
+          todayCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+    }
+  }, [viewType]);
 
   const loadEvents = async () => {
     if (!pseudonymId) {
@@ -108,6 +120,15 @@ const CalendarSection = () => {
       toast({
         title: "Invalid Input",
         description: "Title and date are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!pseudonymId) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log out and log back in to continue",
         variant: "destructive",
       });
       return;
@@ -438,6 +459,11 @@ const CalendarSection = () => {
       daysInCurrentMonth.push(date);
     }
 
+    const todayDate = new Date();
+    const todayIndex = daysInCurrentMonth.findIndex(
+      date => date.toDateString() === todayDate.toDateString()
+    );
+
     return (
       <ScrollArea className="h-full">
         <div className="space-y-4 p-4">
@@ -448,7 +474,11 @@ const CalendarSection = () => {
             const dayNumber = date.getDate();
 
             return (
-              <Card key={date.toISOString()} className={`p-4 ${isToday ? "border-primary border-2" : ""}`}>
+              <Card 
+                key={date.toISOString()} 
+                id={isToday ? "today-card" : undefined}
+                className={`p-4 ${isToday ? "border-primary border-2" : ""}`}
+              >
                 <div className="flex gap-4 cursor-pointer" onClick={() => openEventDialog(date.toISOString().split('T')[0])}>
                   <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4">
                     <div className="text-sm text-muted-foreground uppercase">{dayName}</div>
@@ -544,6 +574,9 @@ const CalendarSection = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Schedule New Event</DialogTitle>
+            <DialogDescription>
+              Add a new event to your calendar with a title, date, and optional description.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
