@@ -51,11 +51,9 @@ const CalendarSection = () => {
 
   useEffect(() => {
     if (isReady && keyReady && pseudonymId) {
-      console.log('[CalendarSection] Encryption ready and key available, loading events...');
       loadEvents();
       cleanupOldEvents();
     } else if (isReady && !keyReady) {
-      console.warn('[CalendarSection] Context ready but no encryption key - waiting for login');
       setLoading(false);
     }
   }, [isReady, keyReady, pseudonymId]);
@@ -68,28 +66,25 @@ const CalendarSection = () => {
     
     // Only run if December 3rd or later
     if (currentMonth === 11 && currentDate >= 3) {
-      console.log('[Calendar] Cleaning up events before December...');
       const decemberFirst = new Date(today.getFullYear(), 11, 1);
       
       try {
-        const eventsToDelete = events.filter(event => {
-          const eventDate = new Date(event.date);
+        const eventsToDelete = events.filter(e => {
+          const eventDate = new Date(e.date);
           return eventDate < decemberFirst;
         });
-        
+
         if (eventsToDelete.length > 0) {
-          const { error } = await supabase
-            .from("calendar_events")
-            .delete()
-            .in('id', eventsToDelete.map(e => e.id));
+          await Promise.all(
+            eventsToDelete.map(e => 
+              supabase.from("calendar_events").delete().eq("id", e.id)
+            )
+          );
           
-          if (error) throw error;
-          
-          console.log(`[Calendar] Deleted ${eventsToDelete.length} old events`);
           setEvents(events.filter(e => !eventsToDelete.find(d => d.id === e.id)));
         }
       } catch (error) {
-        console.error('[Calendar] Error cleaning up old events:', error);
+        // Silently handle cleanup errors
       }
     }
   };
@@ -108,12 +103,10 @@ const CalendarSection = () => {
 
   const loadEvents = async () => {
     if (!pseudonymId) {
-      console.log('[CalendarSection] No pseudonym ID, skipping load');
       setLoading(false);
       return;
     }
 
-    console.log('[CalendarSection] Loading events...');
     try {
       const { data: eventsData, error } = await supabase
         .from("calendar_events")
@@ -121,14 +114,10 @@ const CalendarSection = () => {
         .eq("pseudonym_id", pseudonymId);
 
       if (error) {
-        console.error('[CalendarSection] Error fetching events:', error);
         throw error;
       }
 
-      console.log(`[CalendarSection] Fetched ${eventsData?.length || 0} events`);
-
       if (eventsData) {
-        console.log('[CalendarSection] Decrypting events...');
         const decryptedEvents = await Promise.all(
           eventsData.map(async (e) => {
             try {
@@ -148,14 +137,12 @@ const CalendarSection = () => {
                 description,
               };
             } catch (error) {
-              console.error('[CalendarSection] Failed to decrypt event:', e.id, error);
               return null;
             }
           })
         );
 
         const validEvents = decryptedEvents.filter((e) => e !== null) as CalendarEvent[];
-        console.log(`[CalendarSection] Successfully decrypted ${validEvents.length} events`);
         
         validEvents.sort((a, b) => {
           const dateA = new Date(`${a.date}T${a.time}`);
@@ -166,7 +153,6 @@ const CalendarSection = () => {
         setEvents(validEvents);
       }
     } catch (error) {
-      console.error('[CalendarSection] Error loading events:', error);
       toast({
         title: "Error Loading Events",
         description: "Could not load your events. Please try refreshing the page.",
