@@ -7,8 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CalendarEvent {
@@ -28,6 +28,16 @@ const CalendarSection = () => {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>("month");
+
+  const openEventDialog = (prefilledDate?: string, prefilledTime?: string) => {
+    setNewEvent({
+      title: "",
+      date: prefilledDate || "",
+      time: prefilledTime || "09:00",
+      description: "",
+    });
+    setIsDialogOpen(true);
+  };
   const [newEvent, setNewEvent] = useState({
     title: "",
     date: "",
@@ -292,9 +302,10 @@ const CalendarSection = () => {
                 return (
                   <div
                     key={`${rowIdx}-${colIdx}`}
-                    className={`border-r border-border last:border-r-0 p-2 ${
+                    className={`border-r border-border last:border-r-0 p-2 cursor-pointer ${
                       dayObj.isCurrentMonth ? "bg-background" : "bg-muted/20"
                     } ${isToday ? "bg-primary/10" : ""} hover:bg-muted/50 transition-colors`}
+                    onClick={() => openEventDialog(dayObj.date.toISOString().split('T')[0])}
                   >
                     <div className={`text-sm font-bold mb-1 ${isToday ? "text-primary" : ""} ${!dayObj.isCurrentMonth ? "text-muted-foreground" : ""}`}>
                       {dayObj.day}
@@ -338,68 +349,79 @@ const CalendarSection = () => {
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
-      <div className="flex h-full">
-        {/* Time column */}
-        <div className="w-20 border-r border-border">
-          <div className="h-16 border-b border-border" /> {/* Header spacing */}
-          <ScrollArea className="h-[calc(100%-4rem)]">
-            {hours.map((hour) => (
-              <div key={hour} className="h-16 border-b border-border/50 px-2 py-1 text-xs text-muted-foreground">
-                {`${hour.toString().padStart(2, "0")}:00`}
-              </div>
-            ))}
-          </ScrollArea>
-        </div>
-
-        {/* Days grid */}
-        <div className="flex-1 overflow-hidden">
-          {/* Header */}
-          <div className="h-16 border-b border-border grid grid-cols-7">
-            {weekDays.map((date) => {
-              const isToday = date.toDateString() === new Date().toDateString();
-              return (
-                <div key={date.toISOString()} className={`text-center border-r border-border last:border-r-0 py-2 ${isToday ? "bg-primary/10" : ""}`}>
-                  <div className="text-xs text-muted-foreground uppercase">
-                    {date.toLocaleDateString("en-US", { weekday: "short" })}
-                  </div>
-                  <div className={`text-lg font-bold ${isToday ? "text-primary" : ""}`}>
-                    {date.getDate()}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Events grid */}
-          <ScrollArea className="h-[calc(100%-4rem)]">
-            <div className="grid grid-cols-7">
+      <div className="flex h-full overflow-hidden">
+        {/* Header */}
+        <div className="flex flex-col flex-1">
+          <div className="flex h-16 border-b border-border">
+            <div className="w-20 border-r border-border" />
+            <div className="flex-1 grid grid-cols-7">
               {weekDays.map((date) => {
-                const dayEvents = getEventsForDate(date);
-                
+                const isToday = date.toDateString() === new Date().toDateString();
                 return (
-                  <div key={date.toISOString()} className="border-r border-border last:border-r-0">
-                    {hours.map((hour) => {
-                      const hourEvents = dayEvents.filter((e) => parseInt(e.time.split(":")[0]) === hour);
-                      
-                      return (
-                        <div key={hour} className="h-16 border-b border-border/50 p-1">
-                          {hourEvents.map((event) => (
-                            <div
-                              key={event.id}
-                              className="text-xs p-1 bg-primary/20 rounded cursor-pointer hover:bg-primary/30 truncate"
-                              onClick={() => deleteEvent(event.id)}
-                              title={`${event.time} - ${event.title} (Click to delete)`}
-                            >
-                              <div className="font-bold">{event.time}</div>
-                              <div className="truncate">{event.title}</div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
+                  <div key={date.toISOString()} className={`text-center border-r border-border last:border-r-0 py-2 ${isToday ? "bg-primary/10" : ""}`}>
+                    <div className="text-xs text-muted-foreground uppercase">
+                      {date.toLocaleDateString("en-US", { weekday: "short" })}
+                    </div>
+                    <div className={`text-lg font-bold ${isToday ? "text-primary" : ""}`}>
+                      {date.getDate()}
+                    </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Scrollable time and events grid */}
+          <ScrollArea className="flex-1">
+            <div className="flex">
+              {/* Time column */}
+              <div className="w-20 border-r border-border">
+                {hours.map((hour) => (
+                  <div key={hour} className="h-16 border-b border-border/50 px-2 py-1 text-xs text-muted-foreground">
+                    {`${hour.toString().padStart(2, "0")}:00`}
+                  </div>
+                ))}
+              </div>
+
+              {/* Events grid */}
+              <div className="flex-1 grid grid-cols-7">
+                {weekDays.map((date) => {
+                  const dayEvents = getEventsForDate(date);
+                  const dateStr = date.toISOString().split('T')[0];
+                  
+                  return (
+                    <div key={date.toISOString()} className="border-r border-border last:border-r-0">
+                      {hours.map((hour) => {
+                        const hourEvents = dayEvents.filter((e) => parseInt(e.time.split(":")[0]) === hour);
+                        const timeStr = `${hour.toString().padStart(2, "0")}:00`;
+                        
+                        return (
+                          <div 
+                            key={hour} 
+                            className="h-16 border-b border-border/50 p-1 cursor-pointer hover:bg-muted/30 transition-colors"
+                            onClick={() => hourEvents.length === 0 && openEventDialog(dateStr, timeStr)}
+                          >
+                            {hourEvents.map((event) => (
+                              <div
+                                key={event.id}
+                                className="text-xs p-1 bg-primary/20 rounded cursor-pointer hover:bg-primary/30 truncate"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteEvent(event.id);
+                                }}
+                                title={`${event.time} - ${event.title} (Click to delete)`}
+                              >
+                                <div className="font-bold">{event.time}</div>
+                                <div className="truncate">{event.title}</div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </ScrollArea>
         </div>
@@ -427,7 +449,7 @@ const CalendarSection = () => {
 
             return (
               <Card key={date.toISOString()} className={`p-4 ${isToday ? "border-primary border-2" : ""}`}>
-                <div className="flex gap-4">
+                <div className="flex gap-4 cursor-pointer" onClick={() => openEventDialog(date.toISOString().split('T')[0])}>
                   <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4">
                     <div className="text-sm text-muted-foreground uppercase">{dayName}</div>
                     <div className={`text-3xl font-bold ${isToday ? "text-primary" : ""}`}>{dayNumber}</div>
@@ -478,7 +500,14 @@ const CalendarSection = () => {
           });
 
           return (
-            <Card key={month} className="p-3">
+            <Card 
+              key={month} 
+              className="p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => {
+                setCurrentDate(date);
+                setViewType("month");
+              }}
+            >
               <div className="text-center font-bold mb-2">
                 {date.toLocaleDateString("en-US", { month: "short" })}
               </div>
@@ -498,85 +527,73 @@ const CalendarSection = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* View options with navigation and add button */}
+      {/* View options with navigation */}
       <div className="flex items-center justify-between gap-2 px-4 py-2 border-b">
         <Button variant="ghost" size="icon" onClick={() => navigateDate("prev")}>
           <ChevronLeft className="w-4 h-4" />
         </Button>
         
-        <ScrollArea className="flex-1 whitespace-nowrap">
-          <div className="flex items-center justify-center gap-2">
-            <h2 className="text-xl font-bold">{getDateRangeText()}</h2>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              TODAY
-            </Button>
-          </div>
-        </ScrollArea>
+        <h2 className="text-xl font-bold text-center flex-1">{getDateRangeText()}</h2>
 
         <Button variant="ghost" size="icon" onClick={() => navigateDate("next")}>
           <ChevronRight className="w-4 h-4" />
         </Button>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="icon" className="ml-2">
-              <Plus className="w-4 h-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Schedule New Event</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="eventTitle">Title</Label>
-                <Input
-                  id="eventTitle"
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  placeholder="Event title"
-                  className="font-mono"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="eventDate">Date</Label>
-                  <Input
-                    id="eventDate"
-                    type="date"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                    className="font-mono"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="eventTime">Time</Label>
-                  <Input
-                    id="eventTime"
-                    type="time"
-                    value={newEvent.time}
-                    onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="eventDescription">Description (Optional)</Label>
-                <Textarea
-                  id="eventDescription"
-                  value={newEvent.description}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                  placeholder="Event details..."
-                  className="font-mono"
-                />
-              </div>
-              <Button onClick={addEvent} className="w-full font-bold">
-                SCHEDULE EVENT
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule New Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="eventTitle">Title</Label>
+              <Input
+                id="eventTitle"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                placeholder="Event title"
+                className="font-mono"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="eventDate">Date</Label>
+                <Input
+                  id="eventDate"
+                  type="date"
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  className="font-mono"
+                />
+              </div>
+              <div>
+                <Label htmlFor="eventTime">Time</Label>
+                <Input
+                  id="eventTime"
+                  type="time"
+                  value={newEvent.time}
+                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="eventDescription">Description (Optional)</Label>
+              <Textarea
+                id="eventDescription"
+                value={newEvent.description}
+                onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                placeholder="Event details..."
+                className="font-mono"
+              />
+            </div>
+            <Button onClick={addEvent} className="w-full font-bold">
+              SCHEDULE EVENT
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Calendar view */}
       <div className="flex-1 overflow-hidden">
@@ -586,7 +603,7 @@ const CalendarSection = () => {
         {viewType === "year" && renderYearView()}
       </div>
 
-      {/* Footer with view selector */}
+      {/* Footer with view selector and today button */}
       <div className="flex items-center justify-center gap-2 p-2 border-t bg-background">
         <Button
           variant={viewType === "day" ? "default" : "outline"}
@@ -615,6 +632,13 @@ const CalendarSection = () => {
           onClick={() => setViewType("year")}
         >
           YEAR
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentDate(new Date())}
+        >
+          TODAY
         </Button>
       </div>
     </div>
