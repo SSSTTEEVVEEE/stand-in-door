@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
 import { Pencil, Check, X, ChevronDown, ChevronUp } from "lucide-react";
+import { checklistSchema, reminderSchema } from "@/lib/validation";
 
 interface Reminder {
   id: string;
@@ -116,17 +117,22 @@ const ChecklistsSection = () => {
   };
 
   const createChecklist = async () => {
-    if (!newChecklistName.trim()) {
+    // Validate input with zod schema
+    const validation = checklistSchema.safeParse({
+      name: newChecklistName,
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.issues[0]?.message || "Invalid input";
       toast({
-        title: "Invalid Input",
-        description: "Checklist name cannot be empty",
+        title: "Validation Error",
+        description: errorMessage,
         variant: "destructive",
       });
       return;
     }
 
     if (!pseudonymId) {
-      console.error('[ChecklistsSection] No pseudonym ID available');
       toast({
         title: "Session Error",
         description: "Your session data is missing. Please refresh the page.",
@@ -137,7 +143,9 @@ const ChecklistsSection = () => {
 
     try {
       const now = new Date().toISOString();
-      const { encrypted: encryptedName } = await encrypt(newChecklistName);
+      // Use validated and sanitized data
+      const { name } = validation.data;
+      const { encrypted: encryptedName } = await encrypt(name);
       const { encrypted: encryptedCreatedAt } = await encrypt(now);
 
       const { data, error } = await supabase
@@ -154,7 +162,7 @@ const ChecklistsSection = () => {
 
       const newChecklist: Checklist = {
         id: data.id,
-        name: newChecklistName,
+        name: name,
         reminders: [],
         isComplete: false,
       };
@@ -175,10 +183,16 @@ const ChecklistsSection = () => {
   };
 
   const addReminder = async (checklistId: string, isOneOff: boolean = false) => {
-    if (!newReminderText.trim()) {
+    // Validate input with zod schema
+    const validation = reminderSchema.safeParse({
+      text: newReminderText,
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.issues[0]?.message || "Invalid input";
       toast({
-        title: "Invalid Input",
-        description: "Task text cannot be empty",
+        title: "Validation Error",
+        description: errorMessage,
         variant: "destructive",
       });
       return;
@@ -186,7 +200,9 @@ const ChecklistsSection = () => {
 
     try {
       const now = new Date().toISOString();
-      const { encrypted: encryptedText } = await encrypt(newReminderText);
+      // Use validated and sanitized data
+      const { text } = validation.data;
+      const { encrypted: encryptedText } = await encrypt(text);
       const { encrypted: encryptedCompleted } = await encrypt("false");
       const { encrypted: encryptedCreatedAt } = await encrypt(now);
 

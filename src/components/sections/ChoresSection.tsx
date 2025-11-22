@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
+import { choreSchema } from "@/lib/validation";
 
 interface Chore {
   id?: string;
@@ -88,27 +89,23 @@ const ChoresSection = () => {
   };
 
   const addChore = async () => {
-    if (!newChoreName || !newChorePeriod) {
-      toast({
-        title: "Invalid Input",
-        description: "Please enter both name and period",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Validate input with zod schema
+    const validation = choreSchema.safeParse({
+      name: newChoreName,
+      period: parseInt(newChorePeriod) || 0,
+    });
 
-    const period = parseInt(newChorePeriod);
-    if (period <= 0) {
+    if (!validation.success) {
+      const errorMessage = validation.error.issues[0]?.message || "Invalid input";
       toast({
-        title: "Invalid Period",
-        description: "Period must be greater than 0",
+        title: "Validation Error",
+        description: errorMessage,
         variant: "destructive",
       });
       return;
     }
 
     if (!pseudonymId) {
-      console.error('[ChoresSection] No pseudonym ID available');
       toast({
         title: "Session Error",
         description: "Your session data is missing. Please refresh the page.",
@@ -118,8 +115,10 @@ const ChoresSection = () => {
     }
 
     try {
+      // Use validated and sanitized data
+      const { name, period } = validation.data;
       const now = new Date().toISOString();
-      const { encrypted: encryptedName } = await encrypt(newChoreName);
+      const { encrypted: encryptedName } = await encrypt(name);
       const { encrypted: encryptedPeriod } = await encrypt(period.toString());
       const { encrypted: encryptedCreatedAt } = await encrypt(now);
       const { encrypted: encryptedUpdatedAt } = await encrypt(now);
