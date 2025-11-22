@@ -63,25 +63,13 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
         if (profile) {
           setPseudonymId(profile.pseudonym_id);
           
-          const storedEmail = EncryptionService.getStoredEmail(session.user.id);
-          if (storedEmail) {
-            setEmail(storedEmail);
-          }
-          
-          const storedKey = await EncryptionService.retrieveKey(session.user.id);
-          
-          if (storedKey) {
-            setEncryptionKey(storedKey);
-            setSessionEncryptionKey(storedKey);
+          // Check memory-only session storage
+          const key = getSessionEncryptionKey();
+          if (key) {
+            setEncryptionKey(key);
             setKeyReady(true);
           } else {
-            const key = getSessionEncryptionKey();
-            if (key) {
-              setEncryptionKey(key);
-              setKeyReady(true);
-            } else {
-              setKeyReady(false);
-            }
+            setKeyReady(false);
           }
         } else {
           setKeyReady(false);
@@ -103,10 +91,6 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
         setEmail(null);
         setKeyReady(false);
         clearSessionEncryptionKey();
-        
-        if (session?.user?.id) {
-          EncryptionService.clearKey(session.user.id);
-        }
       } else if (event === 'SIGNED_IN' && session) {
         setTimeout(() => {
           checkSession();
@@ -133,13 +117,6 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
       setEmail(userEmail);
       setSessionEncryptionKey(key);
       setKeyReady(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await EncryptionService.storeKey(user.id, key, userEmail);
-      } else {
-        throw new Error('No user found after authentication');
-      }
     } catch (error) {
       setKeyReady(false);
       throw error;
