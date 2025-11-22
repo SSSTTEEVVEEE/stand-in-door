@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { EncryptionService } from "@/lib/encryption";
 import { useEncryption } from "@/contexts/EncryptionContext";
+import { authSchema } from "@/lib/validation";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -19,54 +19,16 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        console.log('[Auth] User already logged in, redirecting to /app');
         navigate("/app");
       }
     });
   }, [navigate]);
 
-  // Track failed login attempts for fraud detection (3 strikes rule)
-  const getFailedAttempts = (email: string): number => {
-    try {
-      const key = `failed_attempts_${email}`;
-      const attempts = sessionStorage.getItem(key);
-      return attempts ? parseInt(attempts, 10) : 0;
-    } catch (error) {
-      console.error('[Auth] Error reading failed attempts:', error);
-      return 0;
-    }
-  };
-
-  const incrementFailedAttempts = (email: string): number => {
-    try {
-      const key = `failed_attempts_${email}`;
-      const currentAttempts = getFailedAttempts(email);
-      const newAttempts = currentAttempts + 1;
-      sessionStorage.setItem(key, newAttempts.toString());
-      console.log(`[Auth] Failed attempts for ${email}: ${newAttempts}`);
-      return newAttempts;
-    } catch (error) {
-      console.error('[Auth] Error incrementing failed attempts:', error);
-      return 1;
-    }
-  };
-
-  const clearFailedAttempts = (email: string): void => {
-    try {
-      const key = `failed_attempts_${email}`;
-      sessionStorage.removeItem(key);
-      console.log(`[Auth] Cleared failed attempts for ${email}`);
-    } catch (error) {
-      console.error('[Auth] Error clearing failed attempts:', error);
-    }
-  };
-
+  // Server-side fraud detection via edge function
   const trackFailedAttempt = async (email: string, reason: string) => {
     try {
-      console.log('[Auth] Tracking failed attempt:', { email, reason });
       const navigatorData = {
         userAgent: navigator.userAgent,
         language: navigator.language,
@@ -74,63 +36,51 @@ const Auth = () => {
         cookieEnabled: navigator.cookieEnabled,
       };
 
-      const { error } = await supabase.from("failed_auth_attempts").insert({
-        email,
-        reason,
-        navigator_data: navigatorData,
-        user_agent: navigator.userAgent,
+      await supabase.functions.invoke('track-auth-attempt', {
+        body: { email, reason, navigatorData },
       });
-
-      if (error) {
-        console.error('[Auth] Failed to track auth attempt:', error);
-      } else {
-        console.log('[Auth] Successfully tracked fraud telemetry for:', email);
-      }
     } catch (error) {
-      console.error('[Auth] Exception tracking auth attempt:', error);
+      // Silently fail - don't block auth flow
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
-    console.log(`[Auth] ${isLogin ? 'Login' : 'Signup'} attempt for:`, email);
+    // Validate inputs
+    const validation = authSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const firstError = validation.error.issues[0];
+      toast({
+        title: "Validation Error",
+        description: firstError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
 
     try {
       if (isLogin) {
-        console.log('[Auth] Starting login process...');
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+          email: validation.data.email,
+          password: validation.data.password,
         });
 
         if (error) {
-          console.error('[Auth] Login error:', error);
-          
-          // Increment failed attempts counter
-          const attempts = incrementFailedAttempts(email);
-          
-          // Only track in database after 3 failed attempts (fraud telemetry)
-          if (attempts >= 3) {
-            console.warn('[Auth] FRAUD ALERT: 3+ failed login attempts detected for:', email);
-            await trackFailedAttempt(email, `Multiple failed attempts: ${error.message}`);
-          }
+          // Track failed attempt server-side
+          await trackFailedAttempt(email, `Login failed: ${error.message}`);
           
           toast({
             title: "Authentication Failed",
-            description: attempts >= 3 
-              ? "Multiple failed attempts detected. Please verify your credentials."
-              : error.message,
+            description: error.message,
             variant: "destructive",
           });
           return;
         }
 
         if (data.user) {
-          // Clear failed attempts on successful login
-          clearFailedAttempts(email);
-          
           try {
             // Initialize encryption with deterministic salt from email
             await initializeEncryption(email, password);
@@ -141,7 +91,6 @@ const Auth = () => {
             });
             navigate("/app");
           } catch (encryptionError: any) {
-            console.error('[Auth] Encryption initialization failed:', encryptionError);
             toast({
               title: "Encryption Failed",
               description: "Could not initialize encryption. Please try again.",
@@ -151,19 +100,16 @@ const Auth = () => {
           }
         }
       } else {
-        console.log('[Auth] Starting signup process...');
         const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: validation.data.email,
+          password: validation.data.password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
           },
         });
 
         if (error) {
-          console.error('[Auth] Signup error:', error);
-          
-          // Track signup errors as fraud telemetry
+          // Track signup error server-side
           await trackFailedAttempt(email, `Signup error: ${error.message}`);
           
           toast({
@@ -184,7 +130,6 @@ const Auth = () => {
         }
       }
     } catch (error: any) {
-      console.error('[Auth] Unexpected error:', error);
       toast({
         title: "Error",
         description: error.message || "An unexpected error occurred",
