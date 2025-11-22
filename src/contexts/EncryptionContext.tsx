@@ -78,20 +78,34 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const initializeEncryption = async (userEmail: string, password: string) => {
-    // Derive deterministic salt from email
-    const salt = await EncryptionService.deriveSalt(userEmail);
-    
-    // Derive encryption key
-    const key = await EncryptionService.deriveKey(password, salt);
-    
-    setEncryptionKey(key);
-    setEmail(userEmail);
-    setSessionEncryptionKey(key);
-    
-    // Store key in sessionStorage for page refreshes
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await EncryptionService.storeKey(user.id, key);
+    try {
+      console.log('[EncryptionContext] Starting encryption initialization...');
+      
+      // Derive deterministic salt from email
+      console.log('[EncryptionContext] Deriving salt from email...');
+      const salt = await EncryptionService.deriveSalt(userEmail);
+      
+      // Derive encryption key
+      console.log('[EncryptionContext] Deriving encryption key...');
+      const key = await EncryptionService.deriveKey(password, salt);
+      
+      console.log('[EncryptionContext] Setting encryption key in state...');
+      setEncryptionKey(key);
+      setEmail(userEmail);
+      setSessionEncryptionKey(key);
+      
+      // Store key in localStorage for persistence
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        console.log('[EncryptionContext] Storing key to localStorage...');
+        await EncryptionService.storeKey(user.id, key);
+        console.log('[EncryptionContext] Encryption initialization complete');
+      } else {
+        throw new Error('No user found after authentication');
+      }
+    } catch (error) {
+      console.error('[EncryptionContext] Encryption initialization failed:', error);
+      throw error;
     }
   };
 
