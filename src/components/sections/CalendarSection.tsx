@@ -23,7 +23,7 @@ type ViewType = "day" | "week" | "month" | "year";
 
 const CalendarSection = () => {
   const { toast } = useToast();
-  const { encrypt, decrypt, pseudonymId } = useEncryption();
+  const { encrypt, decrypt, pseudonymId, isReady } = useEncryption();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -49,9 +49,12 @@ const CalendarSection = () => {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   useEffect(() => {
-    loadEvents();
-    cleanupOldEvents();
-  }, []);
+    if (isReady && pseudonymId) {
+      console.log('[CalendarSection] Encryption ready, loading events...');
+      loadEvents();
+      cleanupOldEvents();
+    }
+  }, [isReady, pseudonymId]);
   
   // Cleanup events before December if today is Dec 3rd or later
   const cleanupOldEvents = async () => {
@@ -101,16 +104,24 @@ const CalendarSection = () => {
 
   const loadEvents = async () => {
     if (!pseudonymId) {
+      console.log('[CalendarSection] No pseudonym ID, skipping load');
       setLoading(false);
       return;
     }
 
+    console.log('[CalendarSection] Loading events...');
     try {
-      const { data: eventsData } = await supabase
+      const { data: eventsData, error } = await supabase
         .from("calendar_events")
         .select("*")
-        .eq("pseudonym_id", pseudonymId)
-        .order("created_at", { ascending: false });
+        .eq("pseudonym_id", pseudonymId);
+
+      if (error) {
+        console.error('[CalendarSection] Error fetching events:', error);
+        throw error;
+      }
+
+      console.log(`[CalendarSection] Fetched ${eventsData?.length || 0} events`);
 
       if (eventsData) {
         const decryptedEvents = await Promise.all(
@@ -131,12 +142,15 @@ const CalendarSection = () => {
                 description,
               };
             } catch (error) {
+              console.error('[CalendarSection] Failed to decrypt event:', e.id, error);
               return null;
             }
           })
         );
 
         const validEvents = decryptedEvents.filter((e) => e !== null) as CalendarEvent[];
+        console.log(`[CalendarSection] Successfully decrypted ${validEvents.length} events`);
+        
         validEvents.sort((a, b) => {
           const dateA = new Date(`${a.date}T${a.time}`);
           const dateB = new Date(`${b.date}T${b.time}`);
@@ -146,7 +160,12 @@ const CalendarSection = () => {
         setEvents(validEvents);
       }
     } catch (error) {
-      // Error loading events
+      console.error('[CalendarSection] Error loading events:', error);
+      toast({
+        title: "Error Loading Events",
+        description: "Could not load your events. Please try refreshing the page.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

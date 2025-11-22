@@ -92,7 +92,31 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
+    // Initial check
     checkSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[EncryptionContext] Auth state changed:', event);
+      
+      if (event === 'SIGNED_OUT') {
+        console.log('[EncryptionContext] User signed out, clearing encryption data');
+        setEncryptionKey(null);
+        setPseudonymId(null);
+        setEmail(null);
+        clearSessionEncryptionKey();
+      } else if (event === 'SIGNED_IN' && session) {
+        console.log('[EncryptionContext] User signed in, re-checking session');
+        // Defer to avoid deadlock
+        setTimeout(() => {
+          checkSession();
+        }, 0);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const initializeEncryption = async (userEmail: string, password: string) => {
