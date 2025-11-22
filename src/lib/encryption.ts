@@ -50,7 +50,7 @@ export class EncryptionService {
         },
         passwordKey,
         { name: 'AES-GCM', length: KEY_LENGTH },
-        false,
+        true, // Must be extractable to allow exporting for storage
         ['encrypt', 'decrypt']
       );
       
@@ -135,48 +135,54 @@ export class EncryptionService {
     );
   }
 
-  // Store encryption key in session storage (cleared on logout)
+  // Store encryption key in localStorage (persists across sessions)
   static async storeKey(userId: string, key: CryptoKey): Promise<void> {
     try {
+      console.log('[Encryption] Starting key export...');
       const exportedKey = await this.exportKey(key);
-      sessionStorage.setItem(`enc_key_${userId}`, exportedKey);
-      sessionStorage.setItem(`enc_session_${userId}`, 'active');
-      console.log('Encryption key stored for user:', userId);
+      console.log('[Encryption] Key exported successfully, storing to localStorage...');
+      localStorage.setItem(`enc_key_${userId}`, exportedKey);
+      localStorage.setItem(`enc_session_${userId}`, 'active');
+      console.log('[Encryption] Encryption key stored successfully for user:', userId);
     } catch (error) {
-      console.error('Failed to store encryption key:', error);
+      console.error('[Encryption] Failed to store encryption key:', error);
       throw new Error('Could not store encryption key');
     }
   }
 
   static async retrieveKey(userId: string): Promise<CryptoKey | null> {
     try {
-      const exportedKey = sessionStorage.getItem(`enc_key_${userId}`);
+      console.log('[Encryption] Attempting to retrieve key for user:', userId);
+      const exportedKey = localStorage.getItem(`enc_key_${userId}`);
       if (!exportedKey) {
-        console.log('No stored encryption key found for user:', userId);
+        console.log('[Encryption] No stored encryption key found');
         return null;
       }
-      return await this.importKey(exportedKey);
+      console.log('[Encryption] Found stored key, importing...');
+      const key = await this.importKey(exportedKey);
+      console.log('[Encryption] Key imported successfully');
+      return key;
     } catch (error) {
-      console.error('Failed to retrieve encryption key:', error);
+      console.error('[Encryption] Failed to retrieve encryption key:', error);
       return null;
     }
   }
 
   static clearKey(userId: string): void {
     try {
-      sessionStorage.removeItem(`enc_key_${userId}`);
-      sessionStorage.removeItem(`enc_session_${userId}`);
-      console.log('Encryption key cleared for user:', userId);
+      localStorage.removeItem(`enc_key_${userId}`);
+      localStorage.removeItem(`enc_session_${userId}`);
+      console.log('[Encryption] Encryption key cleared for user:', userId);
     } catch (error) {
-      console.error('Failed to clear encryption key:', error);
+      console.error('[Encryption] Failed to clear encryption key:', error);
     }
   }
 
   static hasKey(userId: string): boolean {
     try {
-      return sessionStorage.getItem(`enc_session_${userId}`) === 'active';
+      return localStorage.getItem(`enc_session_${userId}`) === 'active';
     } catch (error) {
-      console.error('Failed to check encryption session:', error);
+      console.error('[Encryption] Failed to check encryption session:', error);
       return false;
     }
   }
