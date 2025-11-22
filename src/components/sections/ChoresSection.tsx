@@ -119,14 +119,10 @@ const ChoresSection = () => {
 
     try {
       const now = new Date().toISOString();
-      const { encrypted: encryptedName, hash: nameHash } = await encrypt(newChoreName);
-      const { encrypted: encryptedPeriod, hash: periodHash } = await encrypt(period.toString());
-      const { encrypted: encryptedCreatedAt, hash: createdHash } = await encrypt(now);
-      const { encrypted: encryptedUpdatedAt, hash: updatedHash } = await encrypt(now);
-
-      // Combine all hashes for integrity check
-      const combinedData = `${newChoreName}|${period}|${now}`;
-      const { hash: dataHash } = await encrypt(combinedData);
+      const { encrypted: encryptedName } = await encrypt(newChoreName);
+      const { encrypted: encryptedPeriod } = await encrypt(period.toString());
+      const { encrypted: encryptedCreatedAt } = await encrypt(now);
+      const { encrypted: encryptedUpdatedAt } = await encrypt(now);
 
       const { data, error } = await supabase
         .from("chores")
@@ -136,7 +132,6 @@ const ChoresSection = () => {
           encrypted_period: encryptedPeriod,
           encrypted_created_at: encryptedCreatedAt,
           encrypted_updated_at: encryptedUpdatedAt,
-          data_hash: dataHash,
         })
         .select()
         .single();
@@ -262,7 +257,6 @@ const ChoresSection = () => {
           const { encrypted: encTime } = await encrypt(eventTime);
           const { encrypted: encDesc } = await encrypt(`Recurring chore (every ${chore.period} days)`);
           const { encrypted: encCreated } = await encrypt(new Date().toISOString());
-          const { hash: dataHash } = await encrypt(`${chore.name}|${eventDate}|${eventTime}`);
           
           calendarEvents.push({
             pseudonym_id: pseudonymId,
@@ -271,7 +265,6 @@ const ChoresSection = () => {
             encrypted_time: encTime,
             encrypted_description: encDesc,
             encrypted_created_at: encCreated,
-            data_hash: dataHash,
           });
           
           currentDate = new Date(currentDate.getTime() + chore.period * 24 * 60 * 60 * 1000);
