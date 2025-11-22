@@ -74,6 +74,10 @@ const Index = () => {
       </main>
 
       <footer className="p-4 md:p-6 border-t flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-bold">STAND</h1>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">in the door</p>
+        </div>
         <div className="flex items-center gap-4">
           <button
             onClick={() => setActiveView("chores")}
@@ -102,14 +106,10 @@ const Index = () => {
           >
             <Calendar className="w-5 h-5" />
           </button>
+          <Button variant="outline" size="icon" onClick={handleLogout} aria-label="Logout">
+            <UserIcon className="w-5 h-5" />
+          </Button>
         </div>
-        <div>
-          <h1 className="text-2xl md:text-4xl font-bold">STAND</h1>
-          <p className="text-muted-foreground text-xs tracking-widest uppercase">in the door</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={handleLogout} aria-label="Logout">
-          <UserIcon className="w-5 h-5" />
-        </Button>
       </footer>
     </div>
   );

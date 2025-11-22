@@ -54,10 +54,20 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
       if (profile) {
         setPseudonymId(profile.pseudonym_id);
         
-        // Check if key is in memory
-        const key = getSessionEncryptionKey();
-        if (key) {
-          setEncryptionKey(key);
+        // Try to retrieve stored key first
+        const storedKey = await EncryptionService.retrieveKey(session.user.id);
+        if (storedKey) {
+          setEncryptionKey(storedKey);
+          setSessionEncryptionKey(storedKey);
+          console.log('[EncryptionContext] Restored encryption key from storage');
+        } else {
+          // Check if key is in memory
+          const key = getSessionEncryptionKey();
+          if (key) {
+            setEncryptionKey(key);
+          } else {
+            console.warn('[EncryptionContext] No encryption key available - user may need to re-login');
+          }
         }
       }
       
@@ -77,6 +87,12 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
     setEncryptionKey(key);
     setEmail(userEmail);
     setSessionEncryptionKey(key);
+    
+    // Store key in sessionStorage for page refreshes
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await EncryptionService.storeKey(user.id, key);
+    }
   };
 
   const encrypt = async (data: string): Promise<{ encrypted: string; hash: string }> => {

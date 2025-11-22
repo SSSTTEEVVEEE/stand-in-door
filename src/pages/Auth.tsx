@@ -134,9 +134,6 @@ const Auth = () => {
           try {
             // Initialize encryption with deterministic salt from email
             await initializeEncryption(email, password);
-            
-            // Store session flag
-            EncryptionService.storeKey(data.user.id, await EncryptionService.deriveKey(password, await EncryptionService.deriveSalt(email)));
 
             toast({
               title: "Access Granted",
@@ -144,6 +141,7 @@ const Auth = () => {
             });
             navigate("/app");
           } catch (encryptionError: any) {
+            console.error('[Auth] Encryption initialization failed:', encryptionError);
             toast({
               title: "Encryption Failed",
               description: "Could not initialize encryption. Please try again.",

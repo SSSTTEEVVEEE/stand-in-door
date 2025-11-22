@@ -45,10 +45,47 @@ const CalendarSection = () => {
     description: "",
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   useEffect(() => {
     loadEvents();
+    cleanupOldEvents();
   }, []);
+  
+  // Cleanup events before December if today is Dec 3rd or later
+  const cleanupOldEvents = async () => {
+    const today = new Date();
+    const currentMonth = today.getMonth(); // 0-indexed, so December is 11
+    const currentDate = today.getDate();
+    
+    // Only run if December 3rd or later
+    if (currentMonth === 11 && currentDate >= 3) {
+      console.log('[Calendar] Cleaning up events before December...');
+      const decemberFirst = new Date(today.getFullYear(), 11, 1);
+      
+      try {
+        const eventsToDelete = events.filter(event => {
+          const eventDate = new Date(event.date);
+          return eventDate < decemberFirst;
+        });
+        
+        if (eventsToDelete.length > 0) {
+          const { error } = await supabase
+            .from("calendar_events")
+            .delete()
+            .in('id', eventsToDelete.map(e => e.id));
+          
+          if (error) throw error;
+          
+          console.log(`[Calendar] Deleted ${eventsToDelete.length} old events`);
+          setEvents(events.filter(e => !eventsToDelete.find(d => d.id === e.id)));
+        }
+      } catch (error) {
+        console.error('[Calendar] Error cleaning up old events:', error);
+      }
+    }
+  };
 
   // Scroll to today in day view
   useEffect(() => {
@@ -185,6 +222,57 @@ const CalendarSection = () => {
     }
   };
 
+  const updateEvent = async () => {
+    if (!editingEvent || !newEvent.title.trim() || !newEvent.date) {
+      toast({
+        title: "Invalid Input",
+        description: "Title and date are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const { encrypted: encTitle } = await encrypt(newEvent.title);
+      const { encrypted: encDate } = await encrypt(newEvent.date);
+      const { encrypted: encTime } = await encrypt(newEvent.time);
+      const { encrypted: encDesc } = await encrypt(newEvent.description || "");
+      const { encrypted: encCreated } = await encrypt(now);
+      const { hash: dataHash } = await encrypt(`${newEvent.title}|${newEvent.date}|${newEvent.time}`);
+
+      const { error } = await supabase
+        .from("calendar_events")
+        .update({
+          encrypted_title: encTitle,
+          encrypted_date: encDate,
+          encrypted_time: encTime,
+          encrypted_description: encDesc,
+          encrypted_created_at: encCreated,
+          data_hash: dataHash,
+        })
+        .eq("id", editingEvent.id);
+
+      if (error) throw error;
+
+      await loadEvents();
+      setIsEditDialogOpen(false);
+      setEditingEvent(null);
+      setNewEvent({ title: "", date: "", time: "09:00", description: "" });
+      
+      toast({
+        title: "Event Updated",
+        description: "Event updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const deleteEvent = async (eventId: string) => {
     try {
       const { error } = await supabase
@@ -195,6 +283,8 @@ const CalendarSection = () => {
       if (error) throw error;
 
       setEvents(events.filter((e) => e.id !== eventId));
+      setIsEditDialogOpen(false);
+      setEditingEvent(null);
       toast({
         title: "Event Deleted",
         description: "Event removed from calendar",
@@ -206,6 +296,17 @@ const CalendarSection = () => {
         variant: "destructive",
       });
     }
+  };
+  
+  const openEditDialog = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setNewEvent({
+      title: event.title,
+      date: event.date,
+      time: event.time,
+      description: event.description || "",
+    });
+    setIsEditDialogOpen(true);
   };
 
   const navigateDate = (direction: "prev" | "next") => {
@@ -336,8 +437,11 @@ const CalendarSection = () => {
                         <div
                           key={event.id}
                           className="text-xs px-1 py-0.5 bg-primary/20 rounded truncate cursor-pointer hover:bg-primary/30"
-                          onClick={() => deleteEvent(event.id)}
-                          title={`${event.time} - ${event.title} (Click to delete)`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(event);
+                          }}
+                          title={`${event.time} - ${event.title}`}
                         >
                           {event.time} {event.title}
                         </div>
@@ -374,7 +478,7 @@ const CalendarSection = () => {
         {/* Header */}
         <div className="flex flex-col flex-1">
           <div className="flex h-16 border-b border-border">
-            <div className="w-20 border-r border-border" />
+            <div className="w-14 border-r border-border" />
             <div className="flex-1 grid grid-cols-7">
               {weekDays.map((date) => {
                 const isToday = date.toDateString() === new Date().toDateString();
@@ -396,9 +500,9 @@ const CalendarSection = () => {
           <ScrollArea className="flex-1">
             <div className="flex">
               {/* Time column */}
-              <div className="w-20 border-r border-border">
+              <div className="w-14 border-r border-border">
                 {hours.map((hour) => (
-                  <div key={hour} className="h-16 border-b border-border/50 px-2 py-1 text-xs text-muted-foreground">
+                  <div key={hour} className="h-16 border-b border-border/50 px-1 py-1 text-xs text-muted-foreground">
                     {`${hour.toString().padStart(2, "0")}:00`}
                   </div>
                 ))}
@@ -428,9 +532,9 @@ const CalendarSection = () => {
                                 className="text-xs p-1 bg-primary/20 rounded cursor-pointer hover:bg-primary/30 truncate"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  deleteEvent(event.id);
+                                  openEditDialog(event);
                                 }}
-                                title={`${event.time} - ${event.title} (Click to delete)`}
+                                title={`${event.time} - ${event.title}`}
                               >
                                 <div className="font-bold">{event.time}</div>
                                 <div className="truncate">{event.title}</div>
@@ -491,8 +595,10 @@ const CalendarSection = () => {
                           <div
                             key={event.id}
                             className="p-3 bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20 transition-colors"
-                            onClick={() => deleteEvent(event.id)}
-                            title="Click to delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(event);
+                            }}
                           >
                             <div className="font-bold">{event.time} - {event.title}</div>
                             {event.description && (
@@ -637,43 +743,115 @@ const CalendarSection = () => {
       </div>
 
       {/* Footer with view selector and today button */}
-      <div className="flex items-center justify-center gap-2 p-2 border-t bg-background">
+      <div className="flex items-center justify-center gap-2 py-1 px-2 border-t bg-background">
         <Button
           variant={viewType === "day" ? "default" : "outline"}
           size="sm"
+          className="h-7 px-3 text-xs"
           onClick={() => setViewType("day")}
         >
-          DAY
+          Day
         </Button>
         <Button
           variant={viewType === "week" ? "default" : "outline"}
           size="sm"
+          className="h-7 px-3 text-xs"
           onClick={() => setViewType("week")}
         >
-          WEEK
+          Week
         </Button>
         <Button
           variant={viewType === "month" ? "default" : "outline"}
           size="sm"
+          className="h-7 px-3 text-xs"
           onClick={() => setViewType("month")}
         >
-          MONTH
+          Month
         </Button>
         <Button
           variant={viewType === "year" ? "default" : "outline"}
           size="sm"
+          className="h-7 px-3 text-xs"
           onClick={() => setViewType("year")}
         >
-          YEAR
+          Year
         </Button>
         <Button
           variant="outline"
           size="sm"
+          className="h-7 px-3 text-xs"
           onClick={() => setCurrentDate(new Date())}
         >
-          TODAY
+          Today
         </Button>
       </div>
+      
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+            <DialogDescription>
+              Update or delete this event.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                placeholder="Event title"
+                className="font-mono"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-date">Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  className="font-mono"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-time">Time</Label>
+                <Input
+                  id="edit-time"
+                  type="time"
+                  value={newEvent.time}
+                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Description (Optional)</Label>
+              <Textarea
+                id="edit-description"
+                value={newEvent.description}
+                onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                placeholder="Event details..."
+                className="font-mono"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={updateEvent} className="flex-1 font-bold">
+                UPDATE
+              </Button>
+              <Button 
+                onClick={() => editingEvent && deleteEvent(editingEvent.id)} 
+                variant="destructive"
+                className="flex-1 font-bold"
+              >
+                DELETE
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
