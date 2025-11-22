@@ -28,19 +28,16 @@ const ChoresSection = () => {
 
   useEffect(() => {
     if (isReady && pseudonymId) {
-      console.log('[ChoresSection] Encryption ready, loading chores...');
       loadChores();
     }
   }, [isReady, pseudonymId]);
 
   const loadChores = async () => {
     if (!pseudonymId) {
-      console.log('[ChoresSection] No pseudonym ID, skipping load');
       setLoading(false);
       return;
     }
 
-    console.log('[ChoresSection] Loading chores...');
     try {
       const { data: choresData, error } = await supabase
         .from("chores")
@@ -48,11 +45,8 @@ const ChoresSection = () => {
         .eq("pseudonym_id", pseudonymId);
 
       if (error) {
-        console.error('[ChoresSection] Error fetching chores:', error);
         throw error;
       }
-
-      console.log(`[ChoresSection] Fetched ${choresData?.length || 0} chores`);
 
       if (choresData) {
         const decryptedChores = await Promise.all(
@@ -66,18 +60,15 @@ const ChoresSection = () => {
                 period,
               };
             } catch (error) {
-              console.error('[ChoresSection] Failed to decrypt chore:', c.id, error);
               return null;
             }
           })
         );
 
         const validChores = decryptedChores.filter((c) => c !== null) as Chore[];
-        console.log(`[ChoresSection] Successfully decrypted ${validChores.length} chores`);
         setChores(validChores);
       }
     } catch (error) {
-      console.error('[ChoresSection] Error loading chores:', error);
       toast({
         title: "Error Loading Chores",
         description: "Could not load your chores. Please try refreshing the page.",
@@ -159,7 +150,7 @@ const ChoresSection = () => {
       try {
         await supabase.from("chores").delete().eq("id", chore.id);
       } catch (error) {
-        console.error("Error deleting chore:", error);
+        // Silently handle deletion errors
       }
     }
     setChores(chores.filter((_, i) => i !== index));

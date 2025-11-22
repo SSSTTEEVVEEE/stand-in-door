@@ -38,19 +38,16 @@ const ChecklistsSection = () => {
 
   useEffect(() => {
     if (isReady && pseudonymId) {
-      console.log('[ChecklistsSection] Encryption ready, loading checklists...');
       loadChecklists();
     }
   }, [isReady, pseudonymId]);
 
   const loadChecklists = async () => {
     if (!pseudonymId) {
-      console.log('[ChecklistsSection] No pseudonym ID, skipping load');
       setLoading(false);
       return;
     }
 
-    console.log('[ChecklistsSection] Loading checklists...');
     try {
       const { data: checklistsData, error } = await supabase
         .from("checklists")
@@ -58,11 +55,8 @@ const ChecklistsSection = () => {
         .eq("pseudonym_id", pseudonymId);
 
       if (error) {
-        console.error('[ChecklistsSection] Error fetching checklists:', error);
         throw error;
       }
-
-      console.log(`[ChecklistsSection] Fetched ${checklistsData?.length || 0} checklists`);
 
       if (checklistsData) {
         const decryptedChecklists = await Promise.all(
@@ -81,7 +75,6 @@ const ChecklistsSection = () => {
                       isOneOff: false,
                     };
                   } catch (error) {
-                    console.error('[ChecklistsSection] Failed to decrypt reminder:', r.id, error);
                     return null;
                   }
                 })
@@ -94,18 +87,15 @@ const ChecklistsSection = () => {
                 isComplete: validReminders.length > 0 && validReminders.every(r => r.completed),
               };
             } catch (error) {
-              console.error('[ChecklistsSection] Failed to decrypt checklist:', c.id, error);
               return null;
             }
           })
         );
 
         const validChecklists = decryptedChecklists.filter((c) => c !== null) as Checklist[];
-        console.log(`[ChecklistsSection] Successfully decrypted ${validChecklists.length} checklists`);
         setChecklists(validChecklists);
       }
     } catch (error) {
-      console.error('[ChecklistsSection] Error loading checklists:', error);
       toast({
         title: "Error Loading Checklists",
         description: "Could not load your checklists. Please try refreshing the page.",
