@@ -163,9 +163,10 @@ const CalendarSection = () => {
     }
 
     if (!pseudonymId) {
+      console.error('[CalendarSection] No pseudonym ID available');
       toast({
-        title: "Authentication Required",
-        description: "Please log out and log back in to continue",
+        title: "Session Error",
+        description: "Your session data is missing. Please refresh the page.",
         variant: "destructive",
       });
       return;
@@ -466,8 +467,8 @@ const CalendarSection = () => {
     
     const weekDays = [];
     for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
+      // Create a new date object for each day to avoid mutation issues
+      const date = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
       weekDays.push(date);
     }
 
