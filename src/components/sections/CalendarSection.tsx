@@ -23,7 +23,7 @@ type ViewType = "day" | "week" | "month" | "year";
 
 const CalendarSection = () => {
   const { toast } = useToast();
-  const { encrypt, decrypt, pseudonymId, isReady } = useEncryption();
+  const { encrypt, decrypt, pseudonymId, isReady, keyReady } = useEncryption();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -49,12 +49,15 @@ const CalendarSection = () => {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   useEffect(() => {
-    if (isReady && pseudonymId) {
-      console.log('[CalendarSection] Encryption ready, loading events...');
+    if (isReady && keyReady && pseudonymId) {
+      console.log('[CalendarSection] Encryption ready and key available, loading events...');
       loadEvents();
       cleanupOldEvents();
+    } else if (isReady && !keyReady) {
+      console.warn('[CalendarSection] Context ready but no encryption key - waiting for login');
+      setLoading(false);
     }
-  }, [isReady, pseudonymId]);
+  }, [isReady, keyReady, pseudonymId]);
   
   // Cleanup events before December if today is Dec 3rd or later
   const cleanupOldEvents = async () => {
@@ -124,14 +127,16 @@ const CalendarSection = () => {
       console.log(`[CalendarSection] Fetched ${eventsData?.length || 0} events`);
 
       if (eventsData) {
+        console.log('[CalendarSection] Decrypting events...');
         const decryptedEvents = await Promise.all(
           eventsData.map(async (e) => {
             try {
-              const title = await decrypt(e.encrypted_title, e.data_hash || undefined);
-              const date = await decrypt(e.encrypted_date, e.data_hash || undefined);
-              const time = await decrypt(e.encrypted_time, e.data_hash || undefined);
+              // Hash is no longer verified - AES-GCM provides authenticated encryption
+              const title = await decrypt(e.encrypted_title);
+              const date = await decrypt(e.encrypted_date);
+              const time = await decrypt(e.encrypted_time);
               const description = e.encrypted_description 
-                ? await decrypt(e.encrypted_description, e.data_hash || undefined)
+                ? await decrypt(e.encrypted_description)
                 : undefined;
 
               return {
