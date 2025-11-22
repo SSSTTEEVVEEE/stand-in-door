@@ -16,7 +16,6 @@ export type Database = {
     Tables: {
       calendar_events: {
         Row: {
-          data_hash: string | null
           encrypted_created_at: string
           encrypted_date: string
           encrypted_description: string | null
@@ -26,7 +25,6 @@ export type Database = {
           pseudonym_id: string
         }
         Insert: {
-          data_hash?: string | null
           encrypted_created_at: string
           encrypted_date: string
           encrypted_description?: string | null
@@ -36,7 +34,6 @@ export type Database = {
           pseudonym_id: string
         }
         Update: {
-          data_hash?: string | null
           encrypted_created_at?: string
           encrypted_date?: string
           encrypted_description?: string | null
@@ -58,7 +55,6 @@ export type Database = {
       checklist_reminders: {
         Row: {
           checklist_id: string
-          data_hash: string | null
           encrypted_completed: string
           encrypted_created_at: string
           encrypted_text: string
@@ -66,7 +62,6 @@ export type Database = {
         }
         Insert: {
           checklist_id: string
-          data_hash?: string | null
           encrypted_completed: string
           encrypted_created_at: string
           encrypted_text: string
@@ -74,7 +69,6 @@ export type Database = {
         }
         Update: {
           checklist_id?: string
-          data_hash?: string | null
           encrypted_completed?: string
           encrypted_created_at?: string
           encrypted_text?: string
@@ -92,21 +86,18 @@ export type Database = {
       }
       checklists: {
         Row: {
-          data_hash: string | null
           encrypted_created_at: string
           encrypted_name: string
           id: string
           pseudonym_id: string
         }
         Insert: {
-          data_hash?: string | null
           encrypted_created_at: string
           encrypted_name: string
           id?: string
           pseudonym_id: string
         }
         Update: {
-          data_hash?: string | null
           encrypted_created_at?: string
           encrypted_name?: string
           id?: string
@@ -124,7 +115,6 @@ export type Database = {
       }
       chores: {
         Row: {
-          data_hash: string | null
           encrypted_created_at: string
           encrypted_name: string
           encrypted_period: string
@@ -133,7 +123,6 @@ export type Database = {
           pseudonym_id: string
         }
         Insert: {
-          data_hash?: string | null
           encrypted_created_at: string
           encrypted_name: string
           encrypted_period: string
@@ -142,7 +131,6 @@ export type Database = {
           pseudonym_id: string
         }
         Update: {
-          data_hash?: string | null
           encrypted_created_at?: string
           encrypted_name?: string
           encrypted_period?: string
@@ -193,7 +181,6 @@ export type Database = {
       focus_monitoring: {
         Row: {
           created_at: string
-          data_hash: string | null
           encrypted_field_name: string
           encrypted_focus_duration: string
           encrypted_timestamp: string
@@ -202,7 +189,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          data_hash?: string | null
           encrypted_field_name: string
           encrypted_focus_duration: string
           encrypted_timestamp: string
@@ -211,7 +197,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          data_hash?: string | null
           encrypted_field_name?: string
           encrypted_focus_duration?: string
           encrypted_timestamp?: string
@@ -231,7 +216,6 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          data_hash: string | null
           encrypted_email: string | null
           id: string
           pseudonym_id: string
@@ -240,7 +224,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          data_hash?: string | null
           encrypted_email?: string | null
           id?: string
           pseudonym_id?: string
@@ -249,7 +232,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          data_hash?: string | null
           encrypted_email?: string | null
           id?: string
           pseudonym_id?: string
@@ -261,7 +243,6 @@ export type Database = {
       user_roles: {
         Row: {
           created_at: string
-          data_hash: string | null
           encrypted_created_at: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
@@ -269,7 +250,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          data_hash?: string | null
           encrypted_created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
@@ -277,7 +257,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          data_hash?: string | null
           encrypted_created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
