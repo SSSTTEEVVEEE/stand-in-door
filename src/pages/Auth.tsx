@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { EncryptionService } from "@/lib/encryption";
-import { setSessionEncryptionKey, clearSessionEncryptionKey } from "@/contexts/EncryptionContext";
+import { useEncryption } from "@/contexts/EncryptionContext";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { initializeEncryption } = useEncryption();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -127,102 +128,15 @@ const Auth = () => {
         }
 
         if (data.user) {
-          console.log('[Auth] Login successful for user:', data.user.id);
-          
           // Clear failed attempts on successful login
           clearFailedAttempts(email);
           
           try {
-            console.log('[Auth] Fetching user profile...');
+            // Initialize encryption with deterministic salt from email
+            await initializeEncryption(email, password);
             
-            // Use maybeSingle() to handle missing profiles gracefully
-            const { data: profile, error: profileError } = await supabase
-              .from("profiles")
-              .select("encryption_salt")
-              .eq("user_id", data.user.id)
-              .maybeSingle();
-
-            if (profileError) {
-              console.error('[Auth] Profile fetch error:', profileError);
-              throw new Error(`Profile fetch failed: ${profileError.message}`);
-            }
-
-            // If profile doesn't exist, create it
-            if (!profile) {
-              console.warn('[Auth] No profile found, creating one...');
-              
-              try {
-                // Generate encryption salt
-                const saltArray = new Uint8Array(32);
-                crypto.getRandomValues(saltArray);
-                const encryption_salt = Array.from(saltArray)
-                  .map(b => b.toString(16).padStart(2, '0'))
-                  .join('');
-                
-                console.log('[Auth] Generated encryption salt');
-                
-                // Create profile
-                const { data: newProfile, error: createError } = await supabase
-                  .from("profiles")
-                  .insert({
-                    user_id: data.user.id,
-                    encryption_salt
-                  })
-                  .select("encryption_salt")
-                  .single();
-                
-                if (createError) {
-                  console.error('[Auth] Failed to create profile:', createError);
-                  throw new Error(`Profile creation failed: ${createError.message}`);
-                }
-                
-                if (!newProfile?.encryption_salt) {
-                  throw new Error("Failed to generate encryption configuration");
-                }
-                
-                console.log('[Auth] Profile created successfully');
-                
-                // Also create default user role
-                const { error: roleError } = await supabase
-                  .from("user_roles")
-                  .insert({
-                    user_id: data.user.id,
-                    role: 'user'
-                  });
-                
-                if (roleError) {
-                  console.warn('[Auth] Failed to create user role:', roleError);
-                  // Don't block login if role creation fails
-                }
-                
-                // Use the newly created profile
-                const key = await EncryptionService.deriveKey(password, newProfile.encryption_salt);
-                setSessionEncryptionKey(key);
-                EncryptionService.storeKey(data.user.id, key);
-                console.log('[Auth] Encryption key stored successfully');
-                
-                toast({
-                  title: "Access Granted",
-                  description: "Authentication successful",
-                });
-                navigate("/app");
-                return;
-              } catch (createError: any) {
-                console.error('[Auth] Profile creation failed:', createError);
-                throw new Error(`Could not create profile: ${createError.message}`);
-              }
-            }
-
-            if (!profile.encryption_salt) {
-              console.error('[Auth] No encryption salt in profile');
-              throw new Error("Encryption configuration missing");
-            }
-
-            console.log('[Auth] Deriving encryption key...');
-            const key = await EncryptionService.deriveKey(password, profile.encryption_salt);
-            setSessionEncryptionKey(key);
-            EncryptionService.storeKey(data.user.id, key);
-            console.log('[Auth] Encryption key stored successfully');
+            // Store session flag
+            EncryptionService.storeKey(data.user.id, await EncryptionService.deriveKey(password, await EncryptionService.deriveSalt(email)));
 
             toast({
               title: "Access Granted",
@@ -230,10 +144,9 @@ const Auth = () => {
             });
             navigate("/app");
           } catch (encryptionError: any) {
-            console.error('[Auth] Encryption initialization failed:', encryptionError);
             toast({
               title: "Encryption Failed",
-              description: encryptionError.message || "Could not initialize encryption. Please try again.",
+              description: "Could not initialize encryption. Please try again.",
               variant: "destructive",
             });
             await supabase.auth.signOut();
@@ -264,92 +177,12 @@ const Auth = () => {
         }
 
         if (data.user) {
-          console.log('[Auth] Signup successful, user ID:', data.user.id);
-          
-          // Wait for the database trigger to create profile
-          console.log('[Auth] Waiting for profile creation...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          try {
-            console.log('[Auth] Verifying profile creation...');
-            
-            // Use maybeSingle() to handle missing profiles
-            const { data: profile, error: profileError } = await supabase
-              .from("profiles")
-              .select("encryption_salt, pseudonym_id")
-              .eq("user_id", data.user.id)
-              .maybeSingle();
-
-            if (profileError) {
-              console.error('[Auth] Profile verification error:', profileError);
-              throw new Error(`Profile verification failed: ${profileError.message}`);
-            }
-
-            // If profile exists and is complete, we're done
-            if (profile?.encryption_salt) {
-              console.log('[Auth] Profile verified successfully');
-              toast({
-                title: "Account Created",
-                description: "You can now log in with your credentials",
-              });
-              setIsLogin(true);
-              setPassword("");
-              return;
-            }
-            
-            // If profile doesn't exist or is incomplete, create it
-            console.warn('[Auth] Profile missing or incomplete, creating...');
-            
-            const saltArray = new Uint8Array(32);
-            crypto.getRandomValues(saltArray);
-            const encryption_salt = Array.from(saltArray)
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('');
-            
-            const { error: createError } = await supabase
-              .from("profiles")
-              .upsert({
-                user_id: data.user.id,
-                encryption_salt
-              }, {
-                onConflict: 'user_id'
-              });
-            
-            if (createError) {
-              console.error('[Auth] Failed to create profile:', createError);
-              throw new Error(`Profile creation failed: ${createError.message}`);
-            }
-            
-            // Create default user role
-            const { error: roleError } = await supabase
-              .from("user_roles")
-              .insert({
-                user_id: data.user.id,
-                role: 'user'
-              });
-            
-            if (roleError && roleError.code !== '23505') { // Ignore duplicate key errors
-              console.warn('[Auth] Failed to create user role:', roleError);
-            }
-            
-            console.log('[Auth] Profile setup completed successfully');
-            toast({
-              title: "Account Created",
-              description: "You can now log in with your credentials",
-            });
-            setIsLogin(true);
-            setPassword("");
-          } catch (verificationError: any) {
-            console.error('[Auth] Profile setup failed:', verificationError);
-            toast({
-              title: "Setup Error",
-              description: verificationError.message || "Account created but setup incomplete. Please try logging in.",
-              variant: "destructive",
-            });
-            
-            // Track this critical error
-            await trackFailedAttempt(email, `Profile setup failed: ${verificationError.message}`);
-          }
+          toast({
+            title: "Account Created",
+            description: "You can now log in with your credentials",
+          });
+          setIsLogin(true);
+          setPassword("");
         }
       }
     } catch (error: any) {

@@ -10,6 +10,16 @@ export class EncryptionService {
   private static encoder = new TextEncoder();
   private static decoder = new TextDecoder();
 
+  // Derive deterministic salt from email address
+  static async deriveSalt(email: string): Promise<string> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const data = this.encoder.encode(normalizedEmail);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
   // Derive encryption key from password using PBKDF2
   static async deriveKey(password: string, salt: string): Promise<CryptoKey> {
     try {

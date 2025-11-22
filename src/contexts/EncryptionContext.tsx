@@ -5,9 +5,11 @@ import { EncryptionService } from "@/lib/encryption";
 interface EncryptionContextType {
   encryptionKey: CryptoKey | null;
   pseudonymId: string | null;
+  email: string | null;
   isReady: boolean;
   encrypt: (data: string) => Promise<{ encrypted: string; hash: string }>;
   decrypt: (encryptedData: string, expectedHash?: string) => Promise<string>;
+  initializeEncryption: (email: string, password: string) => Promise<void>;
 }
 
 const EncryptionContext = createContext<EncryptionContextType | undefined>(undefined);
@@ -30,10 +32,11 @@ export const clearSessionEncryptionKey = () => {
 export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
   const [encryptionKey, setEncryptionKey] = useState<CryptoKey | null>(null);
   const [pseudonymId, setPseudonymId] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const initializeEncryption = async () => {
+    const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -61,8 +64,20 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
       setIsReady(true);
     };
 
-    initializeEncryption();
+    checkSession();
   }, []);
+
+  const initializeEncryption = async (userEmail: string, password: string) => {
+    // Derive deterministic salt from email
+    const salt = await EncryptionService.deriveSalt(userEmail);
+    
+    // Derive encryption key
+    const key = await EncryptionService.deriveKey(password, salt);
+    
+    setEncryptionKey(key);
+    setEmail(userEmail);
+    setSessionEncryptionKey(key);
+  };
 
   const encrypt = async (data: string): Promise<{ encrypted: string; hash: string }> => {
     const key = encryptionKey || getSessionEncryptionKey();
@@ -80,8 +95,18 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
     return EncryptionService.decrypt(encryptedData, key, expectedHash);
   };
 
+  const value = {
+    encryptionKey,
+    pseudonymId,
+    email,
+    isReady,
+    encrypt,
+    decrypt,
+    initializeEncryption,
+  };
+
   return (
-    <EncryptionContext.Provider value={{ encryptionKey, pseudonymId, isReady, encrypt, decrypt }}>
+    <EncryptionContext.Provider value={value}>
       {children}
     </EncryptionContext.Provider>
   );
