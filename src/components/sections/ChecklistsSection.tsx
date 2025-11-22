@@ -103,6 +103,16 @@ const ChecklistsSection = () => {
       return;
     }
 
+    if (!pseudonymId) {
+      console.error('[ChecklistsSection] No pseudonym ID available');
+      toast({
+        title: "Session Error",
+        description: "Your session data is missing. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const now = new Date().toISOString();
       const { encrypted: encryptedName, hash: nameHash } = await encrypt(newChecklistName);

@@ -37,41 +37,59 @@ export const EncryptionProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        setIsReady(true);
-        return;
-      }
-
-      // Get user profile with pseudonym
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("pseudonym_id")
-        .eq("user_id", session.user.id)
-        .single();
-
-      if (profile) {
-        setPseudonymId(profile.pseudonym_id);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         
-        // Try to retrieve stored key first
-        const storedKey = await EncryptionService.retrieveKey(session.user.id);
-        if (storedKey) {
-          setEncryptionKey(storedKey);
-          setSessionEncryptionKey(storedKey);
-          console.log('[EncryptionContext] Restored encryption key from storage');
-        } else {
-          // Check if key is in memory
-          const key = getSessionEncryptionKey();
-          if (key) {
-            setEncryptionKey(key);
-          } else {
-            console.warn('[EncryptionContext] No encryption key available - user may need to re-login');
-          }
+        if (!session) {
+          console.log('[EncryptionContext] No active session');
+          setIsReady(true);
+          return;
         }
+
+        console.log('[EncryptionContext] Active session found, fetching profile...');
+        
+        // Get user profile with pseudonym
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("pseudonym_id")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('[EncryptionContext] Error fetching profile:', error);
+          setIsReady(true);
+          return;
+        }
+
+        if (profile) {
+          console.log('[EncryptionContext] Profile found, pseudonym_id:', profile.pseudonym_id);
+          setPseudonymId(profile.pseudonym_id);
+          
+          // Try to retrieve stored key first
+          const storedKey = await EncryptionService.retrieveKey(session.user.id);
+          if (storedKey) {
+            setEncryptionKey(storedKey);
+            setSessionEncryptionKey(storedKey);
+            console.log('[EncryptionContext] Restored encryption key from localStorage');
+          } else {
+            // Check if key is in memory
+            const key = getSessionEncryptionKey();
+            if (key) {
+              setEncryptionKey(key);
+              console.log('[EncryptionContext] Using encryption key from memory');
+            } else {
+              console.warn('[EncryptionContext] No encryption key available - user needs to re-login');
+            }
+          }
+        } else {
+          console.warn('[EncryptionContext] No profile found for user');
+        }
+        
+        setIsReady(true);
+      } catch (error) {
+        console.error('[EncryptionContext] Unexpected error during session check:', error);
+        setIsReady(true);
       }
-      
-      setIsReady(true);
     };
 
     checkSession();
