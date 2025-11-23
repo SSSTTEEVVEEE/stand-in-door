@@ -47,16 +47,16 @@ const Terms = () => {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-2xl font-bold">Zero-Knowledge Encryption</h2>
+              <h2 className="text-2xl font-bold">Data Encryption</h2>
               <div className="space-y-2 text-foreground/80">
                 <p>
-                  This application implements zero-knowledge encryption principles:
+                  This application implements end-to-end encryption principles:
                 </p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
                   <li>Your data is encrypted on your device before transmission</li>
-                  <li>Encryption keys are derived from your password</li>
+                  <li>Encryption keys are derived from your credentials</li>
                   <li>We cannot access your unencrypted data</li>
-                  <li>Your password is never stored in plain text</li>
+                  <li>Your credentials are never stored in plain text</li>
                 </ul>
               </div>
             </section>
@@ -78,14 +78,14 @@ const Terms = () => {
               <h2 className="text-2xl font-bold">Security</h2>
               <div className="space-y-2 text-foreground/80">
                 <p>
-                  We implement industry-standard security measures including:
+                  We implement industry-standard security measures to protect your data:
                 </p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>PBKDF2 key derivation with 100,000 iterations</li>
-                  <li>AES-256-GCM encryption for all sensitive data</li>
-                  <li>Row-level security policies on database</li>
-                  <li>Failed authentication attempt monitoring</li>
-                  <li>Pseudonymized user identifiers to protect privacy</li>
+                  <li>Military-grade encryption for all sensitive data</li>
+                  <li>Secure password hashing with advanced derivation techniques</li>
+                  <li>Database-level access control and isolation</li>
+                  <li>Authentication security monitoring</li>
+                  <li>Privacy-preserving user identification</li>
                 </ul>
               </div>
             </section>
@@ -109,7 +109,7 @@ const Terms = () => {
               <h2 className="text-2xl font-bold">Important Notice</h2>
               <div className="space-y-2 text-foreground/80">
                 <p className="font-semibold">
-                  Due to zero-knowledge encryption, if you lose your password, your encrypted data cannot be recovered. 
+                  Due to our end-to-end encryption architecture, if you lose your password, your encrypted data cannot be recovered. 
                   Please store your password securely.
                 </p>
               </div>
