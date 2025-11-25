@@ -281,7 +281,7 @@ const ChoresSection = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32">
       <Card className="p-6">
         <h2 className="text-2xl font-bold mb-4">TASK CONFIGURATION</h2>
 
