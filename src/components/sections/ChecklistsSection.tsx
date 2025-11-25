@@ -561,22 +561,28 @@ const ChecklistsSection = () => {
     const reminder = simpleReminders.find(r => r.id === reminderId);
     if (!reminder) return;
 
-    try {
-      const newCompleted = !reminder.completed;
-      const { encrypted: encryptedCompleted } = await encrypt(newCompleted.toString());
-      
-      const { error } = await supabase
-        .from("checklist_reminders")
-        .update({ encrypted_completed: encryptedCompleted })
-        .eq("id", reminderId);
+    // If completing the reminder, delete it
+    if (!reminder.completed) {
+      try {
+        const { error } = await supabase
+          .from("checklist_reminders")
+          .delete()
+          .eq("id", reminderId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setSimpleReminders(simpleReminders.map(r =>
-        r.id === reminderId ? { ...r, completed: newCompleted } : r
-      ));
-    } catch (error) {
-      // Error updating reminder
+        setSimpleReminders(simpleReminders.filter(r => r.id !== reminderId));
+        toast({
+          title: "Reminder Completed",
+          description: "Reminder removed from list",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
