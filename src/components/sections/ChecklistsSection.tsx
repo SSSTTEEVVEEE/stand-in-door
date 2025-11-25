@@ -44,6 +44,7 @@ const ChecklistsSection = () => {
   const [editChecklistName, setEditChecklistName] = useState("");
   const [simpleReminders, setSimpleReminders] = useState<Reminder[]>([]);
   const [newSimpleReminderText, setNewSimpleReminderText] = useState("");
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   useEffect(() => {
     if (isReady && pseudonymId) {
@@ -298,7 +299,7 @@ const ChecklistsSection = () => {
     }
   };
 
-  const completeAllAndReset = async (checklistId: string) => {
+  const completeAllAndReset = async (checklistId: string, silent: boolean = false) => {
     const checklist = checklists.find(c => c.id === checklistId);
     if (!checklist) return;
 
@@ -328,17 +329,36 @@ const ChecklistsSection = () => {
         return c;
       }));
 
-      toast({
-        title: "Checklist Reset",
-        description: "All tasks marked incomplete",
-      });
+      if (!silent) {
+        toast({
+          title: "Checklist Reset",
+          description: "All tasks marked incomplete",
+        });
+      }
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (!silent) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
+  };
+
+  const handleAccordionChange = (value: string[]) => {
+    // Find newly opened accordions
+    const newlyOpened = value.filter(id => !openAccordions.includes(id));
+    
+    // Reset tasks for newly opened checklists
+    newlyOpened.forEach(checklistId => {
+      const checklist = checklists.find(c => c.id === checklistId);
+      if (checklist && checklist.reminders.some(r => r.completed)) {
+        completeAllAndReset(checklistId, true);
+      }
+    });
+    
+    setOpenAccordions(value);
   };
 
   const startEditingReminder = (reminderId: string, currentText: string) => {
@@ -602,7 +622,7 @@ const ChecklistsSection = () => {
       </Card>
 
       {checklists.filter(c => c.name !== "_simple_reminders").length > 0 && (
-        <Accordion type="multiple" className="space-y-4">
+        <Accordion type="multiple" className="space-y-4" value={openAccordions} onValueChange={handleAccordionChange}>
           {checklists.filter(c => c.name !== "_simple_reminders").map((checklist) => (
             <AccordionItem key={checklist.id} value={checklist.id} className="border rounded-lg">
               <Card className="border-0">
