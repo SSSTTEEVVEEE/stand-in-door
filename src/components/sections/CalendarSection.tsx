@@ -700,7 +700,7 @@ const CalendarSection = () => {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] pb-32">
+    <div className="flex flex-col h-[calc(100vh-12rem)]">
       {/* View options with navigation */}
       <div className="flex items-center justify-between gap-2 px-4 py-2 border-b">
         <Button variant="ghost" size="icon" onClick={() => navigateDate("prev")}>
