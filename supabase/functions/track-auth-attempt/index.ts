@@ -3,6 +3,41 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
 // Pattern to match galtsclaim.org and any subdomain (HTTPS only)
 const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-zA-Z0-9-]+\.)*galtsclaim\.org$/;
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const MAX_REQUESTS_PER_WINDOW = 10; // Max 10 requests per minute per IP
+
+// In-memory rate limit store (resets on function cold start)
+const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
+
+function isRateLimited(identifier: string): boolean {
+  const now = Date.now();
+  const record = rateLimitStore.get(identifier);
+  
+  if (!record || now - record.windowStart > RATE_LIMIT_WINDOW_MS) {
+    // New window or first request
+    rateLimitStore.set(identifier, { count: 1, windowStart: now });
+    return false;
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return true;
+  }
+  
+  record.count++;
+  return false;
+}
+
+// Clean up old entries periodically
+function cleanupRateLimitStore() {
+  const now = Date.now();
+  for (const [key, record] of rateLimitStore.entries()) {
+    if (now - record.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimitStore.delete(key);
+    }
+  }
+}
+
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   return ALLOWED_ORIGIN_PATTERN.test(origin);
@@ -47,6 +82,32 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Get IP for rate limiting
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  const realIp = req.headers.get('x-real-ip');
+  const ipAddress = forwardedFor?.split(',')[0] || realIp || 'unknown';
+
+  // Check rate limit
+  if (isRateLimited(ipAddress)) {
+    console.warn(`[track-auth-attempt] Rate limited IP: ${ipAddress}`);
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+      { 
+        status: 429, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': '60'
+        } 
+      }
+    );
+  }
+
+  // Periodically clean up old rate limit entries
+  if (Math.random() < 0.1) {
+    cleanupRateLimitStore();
+  }
+
   try {
     // Initialize Supabase client with service role for database access
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -63,11 +124,6 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Get real IP address from request headers
-    const forwardedFor = req.headers.get('x-forwarded-for');
-    const realIp = req.headers.get('x-real-ip');
-    const ipAddress = forwardedFor?.split(',')[0] || realIp || 'unknown';
 
     // Get user agent from request headers (not client-supplied)
     const userAgent = req.headers.get('user-agent') || 'unknown';
