@@ -1,9 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Pattern to match galtsclaim.org and any subdomain (HTTPS only)
+const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-zA-Z0-9-]+\.)*galtsclaim\.org$/;
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  return ALLOWED_ORIGIN_PATTERN.test(origin);
+}
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = isAllowedOrigin(origin) ? origin! : '';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 interface AuthAttemptPayload {
   email: string;
@@ -17,6 +30,18 @@ interface AuthAttemptPayload {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
+  // Reject requests from disallowed origins
+  if (!isAllowedOrigin(origin)) {
+    console.warn(`[track-auth-attempt] Rejected request from origin: ${origin}`);
+    return new Response(
+      JSON.stringify({ error: 'Origin not allowed' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
