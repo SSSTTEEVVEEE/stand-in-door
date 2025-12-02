@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import HomeAnimation from "@/components/HomeAnimation";
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -14,6 +15,9 @@ const Landing = () => {
             A simple task management system. Your data, your control.
           </p>
         </div>
+
+        {/* p5.js Animation */}
+        <HomeAnimation />
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" className="font-bold text-lg px-8" onClick={() => navigate("/auth")}>
