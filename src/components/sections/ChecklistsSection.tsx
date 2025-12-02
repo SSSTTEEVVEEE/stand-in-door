@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
 import { Pencil, Check, X, Trash2 } from "lucide-react";
 import { checklistSchema, reminderSchema } from "@/lib/validation";
+import { getNextRepeatDate } from "@/components/ui/repeat-days-selector";
 import {
   Accordion,
   AccordionContent,
@@ -21,6 +22,11 @@ interface Reminder {
   text: string;
   completed: boolean;
   isOneOff?: boolean;
+  sourceType?: string; // 'chore' | 'event'
+  sourceId?: string;
+  sourceDate?: string;
+  color?: string;
+  repeatDays?: string[];
 }
 
 interface Checklist {
@@ -29,6 +35,9 @@ interface Checklist {
   reminders: Reminder[];
   isComplete: boolean;
 }
+
+// Military-inspired pastel colors
+const TASK_COLOR = "#7d8c5c"; // Olive green for chores/tasks
 
 const ChecklistsSection = () => {
   const { toast } = useToast();
@@ -45,12 +54,231 @@ const ChecklistsSection = () => {
   const [simpleReminders, setSimpleReminders] = useState<Reminder[]>([]);
   const [newSimpleReminderText, setNewSimpleReminderText] = useState("");
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
+  const [hasAutoPopulated, setHasAutoPopulated] = useState(false);
 
   useEffect(() => {
     if (isReady && pseudonymId) {
       loadChecklists();
     }
   }, [isReady, pseudonymId]);
+
+  // Auto-populate reminders on sign-in
+  useEffect(() => {
+    if (isReady && pseudonymId && !loading && !hasAutoPopulated) {
+      autoPopulateReminders();
+      setHasAutoPopulated(true);
+    }
+  }, [isReady, pseudonymId, loading, hasAutoPopulated]);
+
+  const autoPopulateReminders = async () => {
+    try {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      
+      // Get existing simple reminders to avoid duplicates
+      const existingTexts = new Set(simpleReminders.map(r => r.text));
+      
+      // Fetch chores
+      const { data: choresData } = await supabase
+        .from("chores")
+        .select("*")
+        .eq("pseudonym_id", pseudonymId);
+      
+      // Fetch calendar events
+      const { data: eventsData } = await supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("pseudonym_id", pseudonymId);
+      
+      const newReminders: { text: string; sourceType: string; sourceId: string; sourceDate: string; color?: string; repeatDays?: string[] }[] = [];
+      
+      // Process chores - add for each day from start of month to today
+      if (choresData) {
+        for (const chore of choresData) {
+          try {
+            const name = await decrypt(chore.encrypted_name);
+            const period = parseInt(await decrypt(chore.encrypted_period));
+            
+            // Calculate which days this chore should appear
+            let currentDate = new Date(startOfMonth);
+            while (currentDate <= today) {
+              const daysSinceStart = Math.floor((currentDate.getTime() - startOfMonth.getTime()) / (1000 * 60 * 60 * 24));
+              if (daysSinceStart % period === 0) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const reminderText = `[TASK] ${name} - ${dateStr}`;
+                if (!existingTexts.has(reminderText)) {
+                  newReminders.push({
+                    text: reminderText,
+                    sourceType: 'chore',
+                    sourceId: chore.id,
+                    sourceDate: dateStr,
+                    color: TASK_COLOR,
+                  });
+                  existingTexts.add(reminderText);
+                }
+              }
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+          } catch (e) {
+            // Skip invalid chores
+          }
+        }
+      }
+      
+      // Process calendar events
+      if (eventsData) {
+        for (const event of eventsData) {
+          try {
+            const title = await decrypt(event.encrypted_title);
+            const eventDate = await decrypt(event.encrypted_date);
+            const eventDateTime = new Date(eventDate);
+            
+            // Decrypt repeat days if present
+            let repeatDays: string[] = [];
+            if (event.encrypted_repeat_days) {
+              try {
+                const repeatDaysStr = await decrypt(event.encrypted_repeat_days);
+                repeatDays = JSON.parse(repeatDaysStr);
+              } catch (e) {
+                // No repeat days
+              }
+            }
+            
+            // Decrypt color if present
+            let color: string | undefined;
+            if (event.encrypted_color) {
+              try {
+                color = await decrypt(event.encrypted_color);
+              } catch (e) {
+                // No color
+              }
+            }
+            
+            // Add events that fall within start of month to today
+            if (eventDateTime >= startOfMonth && eventDateTime <= today) {
+              const dateStr = eventDate;
+              const reminderText = `[EVENT] ${title} - ${dateStr}`;
+              if (!existingTexts.has(reminderText)) {
+                newReminders.push({
+                  text: reminderText,
+                  sourceType: 'event',
+                  sourceId: event.id,
+                  sourceDate: dateStr,
+                  color,
+                  repeatDays,
+                });
+                existingTexts.add(reminderText);
+              }
+            }
+            
+            // For repeating events, add instances for each repeat day up to today
+            if (repeatDays.length > 0) {
+              const dayMap: Record<string, number> = {
+                "Su": 0, "M": 1, "Tu": 2, "W": 3, "Th": 4, "F": 5, "Sa": 6
+              };
+              const repeatDayNumbers = repeatDays.map(d => dayMap[d]).filter(n => n !== undefined);
+              
+              let checkDate = new Date(startOfMonth);
+              while (checkDate <= today) {
+                if (repeatDayNumbers.includes(checkDate.getDay())) {
+                  const dateStr = checkDate.toISOString().split('T')[0];
+                  const reminderText = `[EVENT] ${title} - ${dateStr}`;
+                  if (!existingTexts.has(reminderText)) {
+                    newReminders.push({
+                      text: reminderText,
+                      sourceType: 'event',
+                      sourceId: event.id,
+                      sourceDate: dateStr,
+                      color,
+                      repeatDays,
+                    });
+                    existingTexts.add(reminderText);
+                  }
+                }
+                checkDate.setDate(checkDate.getDate() + 1);
+              }
+            }
+          } catch (e) {
+            // Skip invalid events
+          }
+        }
+      }
+      
+      // Add new reminders to database
+      if (newReminders.length > 0) {
+        await addAutoPopulatedReminders(newReminders);
+      }
+    } catch (error) {
+      // Silent fail for auto-population
+    }
+  };
+
+  const addAutoPopulatedReminders = async (reminders: { text: string; sourceType: string; sourceId: string; sourceDate: string; color?: string; repeatDays?: string[] }[]) => {
+    try {
+      const now = new Date().toISOString();
+      const { encrypted: encryptedName } = await encrypt("_simple_reminders");
+      const { encrypted: encryptedCreatedAt } = await encrypt(now);
+      
+      // Get or create simple reminders checklist
+      let simpleChecklistId = checklists.find(c => c.name === "_simple_reminders")?.id;
+      
+      if (!simpleChecklistId) {
+        const { data: checklistData, error: checklistError } = await supabase
+          .from("checklists")
+          .insert({
+            pseudonym_id: pseudonymId,
+            encrypted_name: encryptedName,
+            encrypted_created_at: encryptedCreatedAt,
+          })
+          .select()
+          .single();
+        
+        if (checklistError) return;
+        simpleChecklistId = checklistData.id;
+      }
+      
+      const newReminderItems: Reminder[] = [];
+      
+      for (const reminder of reminders) {
+        const { encrypted: encryptedText } = await encrypt(reminder.text);
+        const { encrypted: encryptedCompleted } = await encrypt("false");
+        
+        const { data, error } = await supabase
+          .from("checklist_reminders")
+          .insert({
+            checklist_id: simpleChecklistId,
+            encrypted_text: encryptedText,
+            encrypted_completed: encryptedCompleted,
+            encrypted_created_at: encryptedCreatedAt,
+            source_type: reminder.sourceType,
+            source_id: reminder.sourceId,
+            source_date: reminder.sourceDate,
+          })
+          .select()
+          .single();
+        
+        if (!error && data) {
+          newReminderItems.push({
+            id: data.id,
+            text: reminder.text,
+            completed: false,
+            isOneOff: true,
+            sourceType: reminder.sourceType,
+            sourceId: reminder.sourceId,
+            sourceDate: reminder.sourceDate,
+            color: reminder.color,
+            repeatDays: reminder.repeatDays,
+          });
+        }
+      }
+      
+      if (newReminderItems.length > 0) {
+        setSimpleReminders(prev => [...prev, ...newReminderItems]);
+      }
+    } catch (error) {
+      // Silent fail
+    }
+  };
 
   const loadChecklists = async () => {
     if (!pseudonymId) {
@@ -561,9 +789,37 @@ const ChecklistsSection = () => {
     const reminder = simpleReminders.find(r => r.id === reminderId);
     if (!reminder) return;
 
-    // If completing the reminder, delete it
+    // If completing the reminder, handle repeating events
     if (!reminder.completed) {
       try {
+        // Check if it's a repeating event
+        if (reminder.repeatDays && reminder.repeatDays.length > 0 && reminder.sourceType === 'event') {
+          // Reschedule to next repeat day
+          const nextDate = getNextRepeatDate(reminder.repeatDays, new Date());
+          if (nextDate) {
+            const dateStr = nextDate.toISOString().split('T')[0];
+            const baseText = reminder.text.replace(/ - \d{4}-\d{2}-\d{2}$/, '');
+            const newText = `${baseText} - ${dateStr}`;
+            
+            // Update the reminder with new date
+            const { encrypted: encryptedText } = await encrypt(newText);
+            await supabase
+              .from("checklist_reminders")
+              .update({ 
+                encrypted_text: encryptedText,
+                source_date: dateStr 
+              })
+              .eq("id", reminderId);
+            
+            setSimpleReminders(simpleReminders.map(r => 
+              r.id === reminderId ? { ...r, text: newText, sourceDate: dateStr } : r
+            ));
+            toast({ title: "Event Rescheduled", description: `Moved to ${dateStr}` });
+            return;
+          }
+        }
+        
+        // Delete non-repeating reminders
         const { error } = await supabase
           .from("checklist_reminders")
           .delete()
@@ -572,16 +828,9 @@ const ChecklistsSection = () => {
         if (error) throw error;
 
         setSimpleReminders(simpleReminders.filter(r => r.id !== reminderId));
-        toast({
-          title: "Reminder Completed",
-          description: "Reminder removed from list",
-        });
+        toast({ title: "Reminder Completed", description: "Reminder removed from list" });
       } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: error.message, variant: "destructive" });
       }
     }
   };
@@ -770,13 +1019,23 @@ const ChecklistsSection = () => {
         {simpleReminders.length > 0 ? (
           <div className="space-y-2">
             {simpleReminders.map((reminder) => (
-              <div key={reminder.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded">
+              <div 
+                key={reminder.id} 
+                className="flex items-center gap-3 p-2 rounded transition-opacity"
+                style={{
+                  backgroundColor: reminder.color ? `${reminder.color}20` : 'hsl(var(--muted) / 0.5)',
+                  borderLeft: reminder.color ? `3px solid ${reminder.color}` : undefined,
+                }}
+              >
                 <Checkbox
                   checked={reminder.completed}
                   onCheckedChange={() => toggleSimpleReminder(reminder.id)}
                 />
                 <span className={`flex-1 ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
                   {reminder.text}
+                  {reminder.repeatDays && reminder.repeatDays.length > 0 && (
+                    <span className="text-xs text-muted-foreground ml-2">(repeats)</span>
+                  )}
                 </span>
                 <Button
                   size="sm"

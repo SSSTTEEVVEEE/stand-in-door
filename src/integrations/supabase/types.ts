@@ -16,27 +16,36 @@ export type Database = {
     Tables: {
       calendar_events: {
         Row: {
+          encrypted_color: string | null
           encrypted_created_at: string
           encrypted_date: string
           encrypted_description: string | null
+          encrypted_end_time: string | null
+          encrypted_repeat_days: string | null
           encrypted_time: string
           encrypted_title: string
           id: string
           pseudonym_id: string
         }
         Insert: {
+          encrypted_color?: string | null
           encrypted_created_at: string
           encrypted_date: string
           encrypted_description?: string | null
+          encrypted_end_time?: string | null
+          encrypted_repeat_days?: string | null
           encrypted_time: string
           encrypted_title: string
           id?: string
           pseudonym_id: string
         }
         Update: {
+          encrypted_color?: string | null
           encrypted_created_at?: string
           encrypted_date?: string
           encrypted_description?: string | null
+          encrypted_end_time?: string | null
+          encrypted_repeat_days?: string | null
           encrypted_time?: string
           encrypted_title?: string
           id?: string
@@ -59,6 +68,9 @@ export type Database = {
           encrypted_created_at: string
           encrypted_text: string
           id: string
+          source_date: string | null
+          source_id: string | null
+          source_type: string | null
         }
         Insert: {
           checklist_id: string
@@ -66,6 +78,9 @@ export type Database = {
           encrypted_created_at: string
           encrypted_text: string
           id?: string
+          source_date?: string | null
+          source_id?: string | null
+          source_type?: string | null
         }
         Update: {
           checklist_id?: string
@@ -73,6 +88,9 @@ export type Database = {
           encrypted_created_at?: string
           encrypted_text?: string
           id?: string
+          source_date?: string | null
+          source_id?: string | null
+          source_type?: string | null
         }
         Relationships: [
           {
