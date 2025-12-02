@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
 import { authSchema } from "@/lib/validation";
+import { secureCredentials } from "@/lib/secureTransmission";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -27,7 +28,8 @@ const Auth = () => {
   }, [navigate]);
 
   // Server-side fraud detection via edge function
-  const trackFailedAttempt = async (email: string, reason: string) => {
+  // Note: We hash the email before sending to protect user identity
+  const trackFailedAttempt = async (hashedEmail: string, reason: string) => {
     try {
       const navigatorData = {
         userAgent: navigator.userAgent,
@@ -37,7 +39,7 @@ const Auth = () => {
       };
 
       await supabase.functions.invoke('track-auth-attempt', {
-        body: { email, reason, navigatorData },
+        body: { email: hashedEmail, reason, navigatorData },
       });
     } catch (error) {
       // Silently fail - don't block auth flow
@@ -62,15 +64,19 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // Derive secure transmission credentials - actual password/email never sent to server
+      const { transmissionEmail, transmissionPassword, originalEmail } = 
+        await secureCredentials(validation.data.email, validation.data.password);
+
       if (isLogin) {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: validation.data.email,
-          password: validation.data.password,
+          email: transmissionEmail,
+          password: transmissionPassword,
         });
 
         if (error) {
-          // Track failed attempt server-side
-          await trackFailedAttempt(email, `Login failed: ${error.message}`);
+          // Track failed attempt with hashed email (protects real email)
+          await trackFailedAttempt(transmissionEmail, `Login failed: ${error.message}`);
           
           toast({
             title: "Authentication Failed",
@@ -82,8 +88,8 @@ const Auth = () => {
 
         if (data.user) {
           try {
-            // Initialize encryption with deterministic salt from email
-            await initializeEncryption(email, password);
+            // Initialize encryption with ORIGINAL credentials (never sent to server)
+            await initializeEncryption(originalEmail, validation.data.password);
 
             toast({
               title: "Access Granted",
@@ -101,16 +107,16 @@ const Auth = () => {
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
-          email: validation.data.email,
-          password: validation.data.password,
+          email: transmissionEmail,
+          password: transmissionPassword,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
           },
         });
 
         if (error) {
-          // Track signup error server-side
-          await trackFailedAttempt(email, `Signup error: ${error.message}`);
+          // Track signup error with hashed email
+          await trackFailedAttempt(transmissionEmail, `Signup error: ${error.message}`);
           
           toast({
             title: "Registration Failed",
