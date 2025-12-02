@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
@@ -11,12 +12,17 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { calendarEventSchema } from "@/lib/validation";
+import { ColorPicker } from "@/components/ui/color-picker";
+import { RepeatDaysSelector } from "@/components/ui/repeat-days-selector";
 
 interface CalendarEvent {
   id: string;
   title: string;
   date: string;
   time: string;
+  endTime?: string;
+  repeatDays?: string[];
+  color?: string;
   description?: string;
 }
 
@@ -35,6 +41,9 @@ const CalendarSection = () => {
       title: "",
       date: prefilledDate || "",
       time: prefilledTime || "09:00",
+      endTime: "",
+      repeatDays: [],
+      color: "#7d8c5c",
       description: "",
     });
     setIsDialogOpen(true);
@@ -43,6 +52,9 @@ const CalendarSection = () => {
     title: "",
     date: "",
     time: "09:00",
+    endTime: "",
+    repeatDays: [] as string[],
+    color: "#7d8c5c",
     description: "",
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -119,7 +131,7 @@ const CalendarSection = () => {
 
       if (eventsData) {
         const decryptedEvents = await Promise.all(
-          eventsData.map(async (e) => {
+          eventsData.map(async (e: any) => {
             try {
               // Hash is no longer verified - AES-GCM provides authenticated encryption
               const title = await decrypt(e.encrypted_title);
@@ -128,12 +140,25 @@ const CalendarSection = () => {
               const description = e.encrypted_description 
                 ? await decrypt(e.encrypted_description)
                 : undefined;
+              const endTime = e.encrypted_end_time
+                ? await decrypt(e.encrypted_end_time)
+                : undefined;
+              const repeatDaysStr = e.encrypted_repeat_days
+                ? await decrypt(e.encrypted_repeat_days)
+                : undefined;
+              const repeatDays = repeatDaysStr ? JSON.parse(repeatDaysStr) : undefined;
+              const color = e.encrypted_color
+                ? await decrypt(e.encrypted_color)
+                : undefined;
 
               return {
                 id: e.id,
                 title,
                 date,
                 time,
+                endTime,
+                repeatDays,
+                color,
                 description,
               };
             } catch (error) {
@@ -200,6 +225,15 @@ const CalendarSection = () => {
       const { encrypted: encTime } = await encrypt(newEvent.time);
       const { encrypted: encDesc } = await encrypt(newEvent.description || "");
       const { encrypted: encCreated } = await encrypt(now);
+      const { encrypted: encEndTime } = newEvent.endTime 
+        ? await encrypt(newEvent.endTime) 
+        : { encrypted: null };
+      const { encrypted: encRepeatDays } = newEvent.repeatDays.length > 0 
+        ? await encrypt(JSON.stringify(newEvent.repeatDays)) 
+        : { encrypted: null };
+      const { encrypted: encColor } = newEvent.color 
+        ? await encrypt(newEvent.color) 
+        : { encrypted: null };
 
       const { data, error } = await supabase
         .from("calendar_events")
@@ -210,6 +244,9 @@ const CalendarSection = () => {
           encrypted_time: encTime,
           encrypted_description: encDesc,
           encrypted_created_at: encCreated,
+          encrypted_end_time: encEndTime,
+          encrypted_repeat_days: encRepeatDays,
+          encrypted_color: encColor,
         })
         .select()
         .single();
@@ -223,11 +260,14 @@ const CalendarSection = () => {
           title: newEvent.title,
           date: newEvent.date,
           time: newEvent.time,
+          endTime: newEvent.endTime || undefined,
+          repeatDays: newEvent.repeatDays.length > 0 ? newEvent.repeatDays : undefined,
+          color: newEvent.color || undefined,
           description: newEvent.description,
         },
       ]);
 
-      setNewEvent({ title: "", date: "", time: "09:00", description: "" });
+      setNewEvent({ title: "", date: "", time: "09:00", endTime: "", repeatDays: [], color: "#7d8c5c", description: "" });
       setIsDialogOpen(false);
       toast({
         title: "Event Scheduled",
@@ -279,6 +319,15 @@ const CalendarSection = () => {
       const { encrypted: encTime } = await encrypt(time);
       const { encrypted: encDesc } = description ? await encrypt(description) : { encrypted: "" };
       const { encrypted: encCreated } = await encrypt(now);
+      const { encrypted: encEndTime } = newEvent.endTime 
+        ? await encrypt(newEvent.endTime) 
+        : { encrypted: null };
+      const { encrypted: encRepeatDays } = newEvent.repeatDays.length > 0 
+        ? await encrypt(JSON.stringify(newEvent.repeatDays)) 
+        : { encrypted: null };
+      const { encrypted: encColor } = newEvent.color 
+        ? await encrypt(newEvent.color) 
+        : { encrypted: null };
 
       const { error } = await supabase
         .from("calendar_events")
@@ -288,6 +337,9 @@ const CalendarSection = () => {
           encrypted_time: encTime,
           encrypted_description: encDesc,
           encrypted_created_at: encCreated,
+          encrypted_end_time: encEndTime,
+          encrypted_repeat_days: encRepeatDays,
+          encrypted_color: encColor,
         })
         .eq("id", editingEvent.id);
 
@@ -296,7 +348,7 @@ const CalendarSection = () => {
       await loadEvents();
       setIsEditDialogOpen(false);
       setEditingEvent(null);
-      setNewEvent({ title: "", date: "", time: "09:00", description: "" });
+      setNewEvent({ title: "", date: "", time: "09:00", endTime: "", repeatDays: [], color: "#7d8c5c", description: "" });
       
       toast({
         title: "Event Updated",
@@ -342,6 +394,9 @@ const CalendarSection = () => {
       title: event.title,
       date: event.date,
       time: event.time,
+      endTime: event.endTime || "",
+      repeatDays: event.repeatDays || [],
+      color: event.color || "#7d8c5c",
       description: event.description || "",
     });
     setIsEditDialogOpen(true);
@@ -474,12 +529,16 @@ const CalendarSection = () => {
                       {dayEvents.slice(0, 2).map((event) => (
                         <div
                           key={event.id}
-                          className="text-xs px-1 py-0.5 bg-primary/20 rounded truncate cursor-pointer hover:bg-primary/30"
+                          className="text-xs px-1 py-0.5 rounded truncate cursor-pointer transition-opacity hover:opacity-80"
+                          style={{ 
+                            backgroundColor: event.color ? `${event.color}40` : 'hsl(var(--primary) / 0.2)',
+                            borderLeft: event.color ? `3px solid ${event.color}` : '3px solid hsl(var(--primary))'
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             openEditDialog(event);
                           }}
-                          title={`${event.time} - ${event.title}`}
+                          title={`${event.time}${event.endTime ? `-${event.endTime}` : ''} - ${event.title}${event.repeatDays?.length ? ' (repeats)' : ''}`}
                         >
                           {event.time} {event.title}
                         </div>
@@ -715,7 +774,7 @@ const CalendarSection = () => {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Schedule New Event</DialogTitle>
             <DialogDescription>
@@ -745,7 +804,7 @@ const CalendarSection = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="eventTime">Time</Label>
+                <Label htmlFor="eventTime">Start Time</Label>
                 <Input
                   id="eventTime"
                   type="time"
@@ -754,6 +813,30 @@ const CalendarSection = () => {
                   className="font-mono"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="eventEndTime">End Time (Optional)</Label>
+              <Input
+                id="eventEndTime"
+                type="time"
+                value={newEvent.endTime}
+                onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                className="font-mono"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Repeats?</Label>
+              <RepeatDaysSelector
+                selectedDays={newEvent.repeatDays}
+                onChange={(days) => setNewEvent({ ...newEvent, repeatDays: days })}
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Color</Label>
+              <ColorPicker
+                color={newEvent.color}
+                onChange={(color) => setNewEvent({ ...newEvent, color })}
+              />
             </div>
             <div>
               <Label htmlFor="eventDescription">Description (Optional)</Label>
@@ -825,7 +908,7 @@ const CalendarSection = () => {
       </div>
       
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
             <DialogDescription>
@@ -855,7 +938,7 @@ const CalendarSection = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="edit-time">Time</Label>
+                <Label htmlFor="edit-time">Start Time</Label>
                 <Input
                   id="edit-time"
                   type="time"
@@ -864,6 +947,30 @@ const CalendarSection = () => {
                   className="font-mono"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="edit-endTime">End Time (Optional)</Label>
+              <Input
+                id="edit-endTime"
+                type="time"
+                value={newEvent.endTime}
+                onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                className="font-mono"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Repeats?</Label>
+              <RepeatDaysSelector
+                selectedDays={newEvent.repeatDays}
+                onChange={(days) => setNewEvent({ ...newEvent, repeatDays: days })}
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Color</Label>
+              <ColorPicker
+                color={newEvent.color}
+                onChange={(color) => setNewEvent({ ...newEvent, color })}
+              />
             </div>
             <div>
               <Label htmlFor="edit-description">Description (Optional)</Label>
