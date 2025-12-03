@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
 import { authSchema } from "@/lib/validation";
 import { secureCredentials } from "@/lib/secureTransmission";
+import { useFraudTelemetry } from "@/hooks/useFraudTelemetry";
+import { TrackingEnforcementModal } from "@/components/TrackingEnforcementModal";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -18,31 +20,32 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // Fraud telemetry
+  const {
+    collectAll,
+    sendTelemetry,
+    reset: resetTelemetry,
+    trackingBlocked,
+    isCollecting,
+    startContinuousMonitoring,
+    stopContinuousMonitoring,
+  } = useFraudTelemetry();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        stopContinuousMonitoring();
         navigate("/app");
       }
     });
-  }, [navigate]);
+  }, [navigate, stopContinuousMonitoring]);
 
-  // Server-side fraud detection via edge function
-  // Note: We hash the email before sending to protect user identity
-  const trackFailedAttempt = async (hashedEmail: string, reason: string) => {
-    try {
-      const navigatorData = {
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        platform: navigator.platform,
-        cookieEnabled: navigator.cookieEnabled,
-      };
-
-      await supabase.functions.invoke('track-auth-attempt', {
-        body: { email: hashedEmail, reason, navigatorData },
-      });
-    } catch (error) {
-      // Silently fail - don't block auth flow
+  // Retry telemetry collection when modal is shown
+  const handleTelemetryRetry = async () => {
+    const success = await collectAll(1);
+    if (success && email) {
+      await sendTelemetry(email, isLogin ? 'login' : 'signup');
     }
   };
 
@@ -64,7 +67,22 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      // Derive secure transmission credentials - actual password/email never sent to server
+      // Reset and collect fresh telemetry
+      resetTelemetry();
+      await collectAll();
+      
+      // Send telemetry (non-blocking for auth flow)
+      const telemetryResult = await sendTelemetry(
+        validation.data.email, 
+        isLogin ? 'login' : 'signup'
+      );
+      
+      // If tracking is blocked but we should continue, start monitoring
+      if (telemetryResult.continueTelemetry) {
+        startContinuousMonitoring(validation.data.email);
+      }
+
+      // Derive secure transmission credentials
       const { transmissionEmail, transmissionPassword, originalEmail } = 
         await secureCredentials(validation.data.email, validation.data.password);
 
@@ -75,8 +93,8 @@ const Auth = () => {
         });
 
         if (error) {
-          // Track failed attempt with hashed email (protects real email)
-          await trackFailedAttempt(transmissionEmail, `Login failed: ${error.message}`);
+          // Send failure telemetry
+          await sendTelemetry(validation.data.email, 'login');
           
           toast({
             title: "Authentication Failed",
@@ -88,9 +106,9 @@ const Auth = () => {
 
         if (data.user) {
           try {
-            // Initialize encryption with ORIGINAL credentials (never sent to server)
             await initializeEncryption(originalEmail, validation.data.password);
-
+            stopContinuousMonitoring();
+            
             toast({
               title: "Access Granted",
               description: "Authentication successful",
@@ -115,8 +133,7 @@ const Auth = () => {
         });
 
         if (error) {
-          // Track signup error with hashed email
-          await trackFailedAttempt(transmissionEmail, `Signup error: ${error.message}`);
+          await sendTelemetry(validation.data.email, 'signup');
           
           toast({
             title: "Registration Failed",
@@ -182,8 +199,12 @@ const Auth = () => {
             />
           </div>
 
-          <Button type="submit" className="w-full font-bold" disabled={loading}>
-            {loading ? "PROCESSING..." : isLogin ? "LOGIN" : "REGISTER"}
+          <Button 
+            type="submit" 
+            className="w-full font-bold" 
+            disabled={loading || isCollecting}
+          >
+            {loading ? "PROCESSING..." : isCollecting ? "VERIFYING..." : isLogin ? "LOGIN" : "REGISTER"}
           </Button>
         </form>
 
@@ -199,6 +220,12 @@ const Auth = () => {
 
         <div className="mt-8 text-center text-xs text-muted-foreground"></div>
       </Card>
+      
+      {/* Security verification modal - blocks interaction when tracking fails */}
+      <TrackingEnforcementModal 
+        isOpen={trackingBlocked} 
+        onRetry={handleTelemetryRetry}
+      />
     </div>
   );
 };
