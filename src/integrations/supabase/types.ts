@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      auth_attempts: {
+        Row: {
+          attempt_type: string
+          created_at: string | null
+          email: string
+          id: string
+          session_id: string | null
+          success: boolean | null
+          user_info: Json | null
+        }
+        Insert: {
+          attempt_type: string
+          created_at?: string | null
+          email: string
+          id?: string
+          session_id?: string | null
+          success?: boolean | null
+          user_info?: Json | null
+        }
+        Update: {
+          attempt_type?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          session_id?: string | null
+          success?: boolean | null
+          user_info?: Json | null
+        }
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           encrypted_color: string | null
@@ -231,6 +261,54 @@ export type Database = {
           },
         ]
       }
+      fraud_audit_log: {
+        Row: {
+          chain_position: number
+          created_at: string | null
+          entry_hash: string
+          entry_type: string
+          id: string
+          ip_hash: string | null
+          new_data: Json | null
+          old_data: Json | null
+          operation: string
+          previous_hash: string | null
+          record_id: string | null
+          session_id: string | null
+          table_name: string
+        }
+        Insert: {
+          chain_position: number
+          created_at?: string | null
+          entry_hash: string
+          entry_type: string
+          id?: string
+          ip_hash?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          operation: string
+          previous_hash?: string | null
+          record_id?: string | null
+          session_id?: string | null
+          table_name: string
+        }
+        Update: {
+          chain_position?: number
+          created_at?: string | null
+          entry_hash?: string
+          entry_type?: string
+          id?: string
+          ip_hash?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          operation?: string
+          previous_hash?: string | null
+          record_id?: string | null
+          session_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -255,6 +333,84 @@ export type Database = {
           pseudonym_id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      request_nonces: {
+        Row: {
+          actual_response_time: string | null
+          created_at: string | null
+          expected_response_time: string | null
+          id: string
+          ip_hash: string | null
+          nonce: string
+          session_id: string | null
+          timing_valid: boolean | null
+        }
+        Insert: {
+          actual_response_time?: string | null
+          created_at?: string | null
+          expected_response_time?: string | null
+          id?: string
+          ip_hash?: string | null
+          nonce: string
+          session_id?: string | null
+          timing_valid?: boolean | null
+        }
+        Update: {
+          actual_response_time?: string | null
+          created_at?: string | null
+          expected_response_time?: string | null
+          id?: string
+          ip_hash?: string | null
+          nonce?: string
+          session_id?: string | null
+          timing_valid?: boolean | null
+        }
+        Relationships: []
+      }
+      response_timing_data: {
+        Row: {
+          anomaly_reason: string | null
+          connection_type: string | null
+          created_at: string | null
+          downlink_estimate: number | null
+          effective_type: string | null
+          endpoint_category: string | null
+          http_status: number | null
+          id: string
+          is_anomalous: boolean | null
+          request_type: string | null
+          response_duration_ms: number | null
+          rtt_estimate: number | null
+        }
+        Insert: {
+          anomaly_reason?: string | null
+          connection_type?: string | null
+          created_at?: string | null
+          downlink_estimate?: number | null
+          effective_type?: string | null
+          endpoint_category?: string | null
+          http_status?: number | null
+          id?: string
+          is_anomalous?: boolean | null
+          request_type?: string | null
+          response_duration_ms?: number | null
+          rtt_estimate?: number | null
+        }
+        Update: {
+          anomaly_reason?: string | null
+          connection_type?: string | null
+          created_at?: string | null
+          downlink_estimate?: number | null
+          effective_type?: string | null
+          endpoint_category?: string | null
+          http_status?: number | null
+          id?: string
+          is_anomalous?: boolean | null
+          request_type?: string | null
+          response_duration_ms?: number | null
+          rtt_estimate?: number | null
         }
         Relationships: []
       }
@@ -287,12 +443,59 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_audit_entry: {
+        Args: {
+          p_entry_type: string
+          p_ip_hash?: string
+          p_new_data?: Json
+          p_old_data?: Json
+          p_operation: string
+          p_record_id: string
+          p_session_id?: string
+          p_table_name: string
+        }
+        Returns: string
+      }
+      check_bulk_operation_alert: {
+        Args: never
+        Returns: {
+          alert_type: string
+          ip_hash: string
+          operation_count: number
+          session_id: string
+          time_window_seconds: number
+        }[]
+      }
+      compute_audit_hash: {
+        Args: {
+          p_chain_position: number
+          p_entry_type: string
+          p_new_data: Json
+          p_old_data: Json
+          p_operation: string
+          p_previous_hash: string
+          p_record_id: string
+          p_table_name: string
+          p_timestamp: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      verify_audit_chain_integrity: {
+        Args: never
+        Returns: {
+          actual_hash: string
+          broken_at_position: number
+          expected_hash: string
+          is_valid: boolean
+          total_entries: number
+        }[]
       }
     }
     Enums: {
