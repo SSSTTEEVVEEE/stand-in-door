@@ -129,7 +129,7 @@ const Auth = () => {
         if (data.user) {
           toast({
             title: "Account Created",
-            description: "You can now log in with your credentials",
+            description: "Please check your email to verify your account before logging in.",
           });
           setIsLogin(true);
           setPassword("");

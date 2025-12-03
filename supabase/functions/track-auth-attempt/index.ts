@@ -2,6 +2,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
 
 // Pattern to match galtsclaim.org and any subdomain (HTTPS only)
 const ALLOWED_ORIGIN_PATTERN = /^https:\/\/([a-zA-Z0-9-]+\.)*galtsclaim\.org$/;
+// Current Lovable dev preview URL
+const DEV_PREVIEW_ORIGIN = 'https://id-preview--ab304a78-53de-4ee9-96fa-4a260e51c65c.lovable.app';
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  // Allow production domain pattern OR the specific dev preview
+  return ALLOWED_ORIGIN_PATTERN.test(origin) || origin === DEV_PREVIEW_ORIGIN;
+}
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
@@ -38,10 +46,7 @@ function cleanupRateLimitStore() {
   }
 }
 
-function isAllowedOrigin(origin: string | null): boolean {
-  if (!origin) return false;
-  return ALLOWED_ORIGIN_PATTERN.test(origin);
-}
+// isAllowedOrigin is now defined above with DEV_PREVIEW_ORIGIN
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigin = isAllowedOrigin(origin) ? origin! : '';
