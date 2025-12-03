@@ -64,18 +64,19 @@ export async function deriveTransmissionEmail(email: string): Promise<string> {
 
 /**
  * Transforms credentials for secure transmission
- * Email is hashed for privacy, password sent over TLS (not hashed - per user request)
+ * Password is cryptographically derived before transmission, email sent over TLS
  */
 export async function secureCredentials(email: string, password: string): Promise<{
   transmissionEmail: string;
   transmissionPassword: string;
   originalEmail: string;
 }> {
-  const transmissionEmail = await deriveTransmissionEmail(email);
+  const normalizedEmail = email.toLowerCase().trim();
+  const transmissionPassword = await deriveTransmissionPassword(password, normalizedEmail);
   
   return {
-    transmissionEmail,
-    transmissionPassword: password, // Send password directly over TLS
-    originalEmail: email // Keep for encryption key derivation (never sent to server)
+    transmissionEmail: normalizedEmail, // Send email directly over TLS
+    transmissionPassword, // Derived password - actual password never transmitted
+    originalEmail: normalizedEmail // Keep for encryption key derivation
   };
 }
