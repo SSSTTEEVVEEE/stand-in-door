@@ -7,35 +7,35 @@ All colors MUST be HSL.
 */
 
 @layer base {
+  /* Light mode - clean, professional */
   :root {
-    /* Military industrial design system - black bg, white text, high contrast */
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
 
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
 
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 5%;
+    --primary: 0 0% 12%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 12%;
 
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 0 0% 88%;
+    --accent-foreground: 0 0% 12%;
 
     --destructive: 0 84% 45%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 98%;
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 0 0% 12%;
 
     --radius: 0.25rem;
 
@@ -46,6 +46,47 @@ All colors MUST be HSL.
     /* Tactical yellow */
     --tactical-yellow: 48 100% 50%;
     --tactical-yellow-foreground: 0 0% 5%;
+  }
+
+  /* Dark mode - military industrial design system */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 0 0% 5%;
+      --foreground: 0 0% 98%;
+
+      --card: 0 0% 8%;
+      --card-foreground: 0 0% 98%;
+
+      --popover: 0 0% 8%;
+      --popover-foreground: 0 0% 98%;
+
+      --primary: 0 0% 98%;
+      --primary-foreground: 0 0% 5%;
+
+      --secondary: 0 0% 15%;
+      --secondary-foreground: 0 0% 98%;
+
+      --muted: 0 0% 12%;
+      --muted-foreground: 0 0% 60%;
+
+      --accent: 0 0% 20%;
+      --accent-foreground: 0 0% 98%;
+
+      --destructive: 0 84% 45%;
+      --destructive-foreground: 0 0% 98%;
+
+      --border: 0 0% 18%;
+      --input: 0 0% 18%;
+      --ring: 0 0% 98%;
+
+      /* Military green accent */
+      --military-green: 120 20% 35%;
+      --military-green-foreground: 0 0% 98%;
+
+      /* Tactical yellow */
+      --tactical-yellow: 48 100% 50%;
+      --tactical-yellow-foreground: 0 0% 5%;
+    }
   }
 }
 
