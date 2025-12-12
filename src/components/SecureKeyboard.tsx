@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
 
 type KeyboardMode = "lowercase" | "uppercase" | "symbols";
 type InputType = "email" | "password" | "text";
@@ -156,13 +157,64 @@ export const SecureKeyboard = ({
     [mode, onKeyPress, onDelete, onSubmit, getSecureRandom, showKeyHighlight]
   );
 
-  if (!visible) return null;
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  // Handle mount/unmount animations
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      // Small delay to ensure DOM is ready for animation
+      requestAnimationFrame(() => {
+        setIsAnimating(true);
+      });
+    } else if (shouldRender) {
+      setIsAnimating(false);
+      // Wait for exit animation to complete
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, shouldRender]);
+
+  if (!shouldRender) return null;
 
   const rows = getRows();
 
+  const handleDismiss = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSubmit();
+  };
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-secondary/95 backdrop-blur-sm border-t border-border p-2 z-50 select-none touch-none">
-      <div className="max-w-lg mx-auto">
+    <div 
+      className={`
+        fixed bottom-0 left-0 right-0 
+        bg-secondary/95 backdrop-blur-sm border-t border-border 
+        z-50 select-none touch-none
+        transition-transform duration-300 ease-out
+        ${isAnimating ? "translate-y-0" : "translate-y-full"}
+      `}
+    >
+      {/* Dismiss row */}
+      <button
+        type="button"
+        onTouchStart={handleDismiss}
+        onMouseDown={handleDismiss}
+        className="w-full h-8 flex items-center justify-center border-b border-border/50 bg-muted/50 hover:bg-muted transition-colors"
+        style={{
+          WebkitTapHighlightColor: "transparent",
+          WebkitTouchCallout: "none",
+          userSelect: "none",
+        }}
+      >
+        <ChevronDown className="w-5 h-5 text-muted-foreground" />
+      </button>
+      
+      {/* Keyboard rows */}
+      <div className="max-w-lg mx-auto p-2">
         {rows.map((row, rowIndex) => (
           <div
             key={rowIndex}
