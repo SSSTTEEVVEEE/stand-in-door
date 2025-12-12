@@ -275,23 +275,27 @@ export const SecureKeyboard = ({
   // Platform-specific styling
   const getKeyboardContainerStyle = () => {
     if (isIOS) {
-      return "bg-[hsl(220,10%,85%)] dark:bg-[hsl(0,0%,18%)]";
+      // iOS: Light mode - light gray, Dark mode - dark gray
+      return "bg-[hsl(220,5%,82%)] dark:bg-[hsl(0,0%,15%)]";
     }
-    return "bg-[hsl(0,0%,20%)] dark:bg-[hsl(0,0%,12%)]";
+    // Android: Darker overall
+    return "bg-[hsl(0,0%,18%)] dark:bg-[hsl(0,0%,10%)]";
   };
 
   const getKeyStyle = (isSpecial: boolean, isSpace: boolean, isHighlighted: boolean) => {
     if (isIOS) {
+      // iOS Light: White keys with BLACK text for maximum contrast
+      // iOS Dark: Dark gray keys with white text
       const base = isSpecial || isSpace
-        ? "bg-[hsl(220,8%,72%)] dark:bg-[hsl(0,0%,28%)] text-foreground"
-        : "bg-[hsl(0,0%,100%)] dark:bg-[hsl(0,0%,38%)] text-foreground shadow-[0_1px_0_hsl(0,0%,60%)] dark:shadow-[0_1px_0_hsl(0,0%,8%)]";
-      return isHighlighted ? `${base} !bg-[hsl(220,8%,72%)] dark:!bg-[hsl(0,0%,48%)]` : base;
+        ? "bg-[hsl(220,5%,68%)] text-[hsl(0,0%,5%)] dark:bg-[hsl(0,0%,30%)] dark:text-[hsl(0,0%,95%)]"
+        : "bg-[hsl(0,0%,100%)] text-[hsl(0,0%,0%)] shadow-[0_1px_2px_hsl(0,0%,0%,0.15)] dark:bg-[hsl(0,0%,40%)] dark:text-[hsl(0,0%,100%)] dark:shadow-[0_1px_0_hsl(0,0%,5%)]";
+      return isHighlighted ? `${base} !bg-[hsl(210,100%,55%)] !text-white dark:!bg-[hsl(210,100%,45%)]` : base;
     }
-    // Android/Gboard style
+    // Android/Gboard style - consistent dark theme with good contrast
     const base = isSpecial
-      ? "bg-[hsl(0,0%,28%)] dark:bg-[hsl(0,0%,22%)] text-[hsl(0,0%,80%)]"
-      : "bg-[hsl(0,0%,32%)] dark:bg-[hsl(0,0%,25%)] text-[hsl(0,0%,95%)]";
-    return isHighlighted ? `${base} !bg-[hsl(0,0%,45%)]` : base;
+      ? "bg-[hsl(0,0%,25%)] text-[hsl(0,0%,85%)] dark:bg-[hsl(0,0%,20%)] dark:text-[hsl(0,0%,90%)]"
+      : "bg-[hsl(0,0%,30%)] text-[hsl(0,0%,95%)] dark:bg-[hsl(0,0%,25%)] dark:text-[hsl(0,0%,98%)]";
+    return isHighlighted ? `${base} !bg-[hsl(210,100%,50%)] !text-white` : base;
   };
 
   const getKeyWidth = (key: string, isSpecial: boolean, isSpace: boolean) => {
@@ -306,7 +310,7 @@ export const SecureKeyboard = ({
 
   const renderKey = (key: string) => {
     if (key === "🌐") return <Globe className="w-4 h-4" />;
-    if (key === "SPACE") return isIOS ? <span className="text-xs text-muted-foreground">space</span> : null;
+    if (key === "SPACE") return isIOS ? <span className="text-xs opacity-60">space</span> : null;
     return key;
   };
 
@@ -326,8 +330,10 @@ export const SecureKeyboard = ({
         type="button"
         onTouchStart={handleDismissTouchStart}
         onMouseDown={handleDismissMouseDown}
-        className={`w-full h-7 flex items-center justify-center border-b border-border/20 ${
-          isIOS ? "bg-[hsl(220,10%,82%)] dark:bg-[hsl(0,0%,15%)]" : "bg-[hsl(0,0%,18%)] dark:bg-[hsl(0,0%,10%)]"
+        className={`w-full h-7 flex items-center justify-center border-b ${
+          isIOS 
+            ? "bg-[hsl(220,5%,78%)] border-[hsl(0,0%,70%)] dark:bg-[hsl(0,0%,12%)] dark:border-[hsl(0,0%,20%)]" 
+            : "bg-[hsl(0,0%,15%)] border-[hsl(0,0%,25%)] dark:bg-[hsl(0,0%,8%)] dark:border-[hsl(0,0%,15%)]"
         } hover:opacity-80 transition-opacity`}
         style={{
           WebkitTapHighlightColor: "transparent",
@@ -335,7 +341,7 @@ export const SecureKeyboard = ({
           userSelect: "none",
         }}
       >
-        <ChevronDown className={`w-4 h-4 ${isIOS ? "text-[hsl(0,0%,40%)]" : "text-[hsl(0,0%,60%)]"}`} />
+        <ChevronDown className={`w-4 h-4 ${isIOS ? "text-[hsl(0,0%,30%)] dark:text-[hsl(0,0%,70%)]" : "text-[hsl(0,0%,70%)] dark:text-[hsl(0,0%,80%)]"}`} />
       </button>
       
       {/* Keyboard rows */}
