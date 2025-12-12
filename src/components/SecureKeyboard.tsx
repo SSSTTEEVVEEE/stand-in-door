@@ -61,6 +61,7 @@ export const SecureKeyboard = ({
   const [mode, setMode] = useState<KeyboardMode>("lowercase");
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isTouchRef = useRef(false);
 
   const getRows = () => {
     switch (mode) {
@@ -118,11 +119,8 @@ export const SecureKeyboard = ({
   }, [inputType, getSecureRandom, mode, zeroFeedback]);
 
   // Handle key press with timing jitter
-  const handleKeyTouch = useCallback(
-    (key: string, rowIndex: number, colIndex: number, e: React.TouchEvent | React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
+  const handleKeyPress = useCallback(
+    (key: string, rowIndex: number, colIndex: number) => {
       const keyId = `${rowIndex}-${colIndex}`;
       
       // Only show highlight for character keys
@@ -157,6 +155,27 @@ export const SecureKeyboard = ({
     [mode, onKeyPress, onDelete, onSubmit, getSecureRandom, showKeyHighlight]
   );
 
+  const handleTouchStart = useCallback(
+    (key: string, rowIndex: number, colIndex: number, e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isTouchRef.current = true;
+      handleKeyPress(key, rowIndex, colIndex);
+    },
+    [handleKeyPress]
+  );
+
+  const handleMouseDown = useCallback(
+    (key: string, rowIndex: number, colIndex: number, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Ignore mouse events on touch devices - touch already handled it
+      if (isTouchRef.current) return;
+      handleKeyPress(key, rowIndex, colIndex);
+    },
+    [handleKeyPress]
+  );
+
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
 
@@ -182,9 +201,17 @@ export const SecureKeyboard = ({
 
   const rows = getRows();
 
-  const handleDismiss = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleDismissTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    isTouchRef.current = true;
+    onSubmit();
+  };
+
+  const handleDismissMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isTouchRef.current) return;
     onSubmit();
   };
 
@@ -201,8 +228,8 @@ export const SecureKeyboard = ({
       {/* Dismiss row */}
       <button
         type="button"
-        onTouchStart={handleDismiss}
-        onMouseDown={handleDismiss}
+        onTouchStart={handleDismissTouchStart}
+        onMouseDown={handleDismissMouseDown}
         className="w-full h-8 flex items-center justify-center border-b border-border/50 bg-muted/50 hover:bg-muted transition-colors"
         style={{
           WebkitTapHighlightColor: "transparent",
@@ -232,8 +259,8 @@ export const SecureKeyboard = ({
                 <button
                   key={colIndex}
                   type="button"
-                  onTouchStart={(e) => handleKeyTouch(key, rowIndex, colIndex, e)}
-                  onMouseDown={(e) => handleKeyTouch(key, rowIndex, colIndex, e)}
+                  onTouchStart={(e) => handleTouchStart(key, rowIndex, colIndex, e)}
+                  onMouseDown={(e) => handleMouseDown(key, rowIndex, colIndex, e)}
                   className={`
                     ${isSpace ? "flex-1 min-w-[140px]" : isSpecial ? "w-12" : "w-8"} 
                     h-11 
