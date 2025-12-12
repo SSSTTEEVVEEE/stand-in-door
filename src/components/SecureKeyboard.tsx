@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 
 type KeyboardMode = "lowercase" | "uppercase" | "symbols";
+type InputType = "email" | "password";
 
 interface SecureKeyboardProps {
   onKeyPress: (char: string) => void;
   onDelete: () => void;
   onSubmit: () => void;
   visible: boolean;
+  inputType: InputType;
 }
 
 const LOWERCASE_ROWS = [
@@ -38,7 +40,7 @@ const getAllKeyPositions = (rows: string[][]) => {
   const positions: { row: number; col: number; key: string }[] = [];
   rows.forEach((row, rowIndex) => {
     row.forEach((key, colIndex) => {
-      if (key && key !== "SPACE") {
+      if (key && key !== "SPACE" && !["⇧", "⌫", "⏎", "#+=", "ABC"].includes(key)) {
         positions.push({ row: rowIndex, col: colIndex, key });
       }
     });
@@ -51,11 +53,11 @@ export const SecureKeyboard = ({
   onDelete,
   onSubmit,
   visible,
+  inputType,
 }: SecureKeyboardProps) => {
   const [mode, setMode] = useState<KeyboardMode>("lowercase");
-  const [decoyKeys, setDecoyKeys] = useState<Set<string>>(new Set());
-  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
-  const animationFrameRef = useRef<number | null>(null);
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const getRows = () => {
     switch (mode) {
@@ -75,62 +77,50 @@ export const SecureKeyboard = ({
     return array[0] / (0xffffffff + 1);
   }, []);
 
-  // Fake touch event generator
-  useEffect(() => {
-    if (!visible) {
-      timeoutRefs.current.forEach(clearTimeout);
-      timeoutRefs.current = [];
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      return;
+  // Show key highlight (real for email, random for password)
+  const showKeyHighlight = useCallback((actualKeyId: string) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
 
-    const generateFakeTouch = () => {
-      const rows = getRows();
-      const positions = getAllKeyPositions(rows);
+    if (inputType === "email") {
+      // For email: show the actual key pressed
+      setHighlightedKey(actualKeyId);
+      timeoutRef.current = setTimeout(() => {
+        setHighlightedKey(null);
+      }, 100 + getSecureRandom() * 50);
+    } else {
+      // For password: show a random key with slight delay
+      const delay = 20 + getSecureRandom() * 80;
       
-      // Randomly select 1-3 keys to highlight
-      const numKeys = 1 + Math.floor(getSecureRandom() * 2);
-      const selectedKeys = new Set<string>();
-      
-      for (let i = 0; i < numKeys; i++) {
+      timeoutRef.current = setTimeout(() => {
+        const rows = getRows();
+        const positions = getAllKeyPositions(rows);
         const randomIndex = Math.floor(getSecureRandom() * positions.length);
-        const pos = positions[randomIndex];
-        selectedKeys.add(`${pos.row}-${pos.col}`);
-      }
-      
-      setDecoyKeys(selectedKeys);
-      
-      // Clear decoy after random duration (50-150ms)
-      const clearDuration = 50 + getSecureRandom() * 100;
-      const clearTimeout = setTimeout(() => {
-        setDecoyKeys(new Set());
-      }, clearDuration);
-      timeoutRefs.current.push(clearTimeout);
-      
-      // Schedule next fake touch at random interval (100-400ms)
-      const nextInterval = 100 + getSecureRandom() * 300;
-      const nextTimeout = setTimeout(generateFakeTouch, nextInterval);
-      timeoutRefs.current.push(nextTimeout);
-    };
+        const randomPos = positions[randomIndex];
+        const randomKeyId = `${randomPos.row}-${randomPos.col}`;
+        
+        setHighlightedKey(randomKeyId);
+        
+        timeoutRef.current = setTimeout(() => {
+          setHighlightedKey(null);
+        }, 80 + getSecureRandom() * 70);
+      }, delay);
+    }
+  }, [inputType, getSecureRandom, mode]);
 
-    // Start fake touch generation
-    const initialDelay = 500 + getSecureRandom() * 500;
-    const initialTimeout = setTimeout(generateFakeTouch, initialDelay);
-    timeoutRefs.current.push(initialTimeout);
-
-    return () => {
-      timeoutRefs.current.forEach(clearTimeout);
-      timeoutRefs.current = [];
-    };
-  }, [visible, mode, getSecureRandom]);
-
-  // Handle key press with timing jitter and coordinate noise
+  // Handle key press with timing jitter
   const handleKeyTouch = useCallback(
-    (key: string, e: React.TouchEvent | React.MouseEvent) => {
+    (key: string, rowIndex: number, colIndex: number, e: React.TouchEvent | React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+
+      const keyId = `${rowIndex}-${colIndex}`;
+      
+      // Only show highlight for character keys
+      if (!["⇧", "⌫", "⏎", "#+=", "ABC", "SPACE", ""].includes(key)) {
+        showKeyHighlight(keyId);
+      }
 
       // Add timing jitter (0-50ms)
       const jitter = getSecureRandom() * 50;
@@ -150,14 +140,13 @@ export const SecureKeyboard = ({
           onKeyPress(" ");
         } else if (key !== "") {
           onKeyPress(key);
-          // Auto-return to lowercase after typing in uppercase (except for caps lock double-tap)
           if (mode === "uppercase") {
             setMode("lowercase");
           }
         }
       }, jitter);
     },
-    [mode, onKeyPress, onDelete, onSubmit, getSecureRandom]
+    [mode, onKeyPress, onDelete, onSubmit, getSecureRandom, showKeyHighlight]
   );
 
   if (!visible) return null;
@@ -176,7 +165,7 @@ export const SecureKeyboard = ({
               if (key === "") return <div key={colIndex} className="w-8 h-11" />;
               
               const keyId = `${rowIndex}-${colIndex}`;
-              const isDecoy = decoyKeys.has(keyId);
+              const isHighlighted = highlightedKey === keyId;
               const isSpecial = ["⇧", "⌫", "⏎", "#+=", "ABC"].includes(key);
               const isSpace = key === "SPACE";
               
@@ -184,8 +173,8 @@ export const SecureKeyboard = ({
                 <button
                   key={colIndex}
                   type="button"
-                  onTouchStart={(e) => handleKeyTouch(key, e)}
-                  onMouseDown={(e) => handleKeyTouch(key, e)}
+                  onTouchStart={(e) => handleKeyTouch(key, rowIndex, colIndex, e)}
+                  onMouseDown={(e) => handleKeyTouch(key, rowIndex, colIndex, e)}
                   className={`
                     ${isSpace ? "flex-1 min-w-[140px]" : isSpecial ? "w-12" : "w-8"} 
                     h-11 
@@ -193,7 +182,7 @@ export const SecureKeyboard = ({
                     flex items-center justify-center
                     text-sm font-medium
                     transition-none
-                    ${isDecoy ? "bg-primary/30 shadow-[0_0_8px_hsl(var(--primary)/0.4)]" : "bg-muted"}
+                    ${isHighlighted ? "bg-primary/30 shadow-[0_0_8px_hsl(var(--primary)/0.4)]" : "bg-muted"}
                     ${isSpecial ? "text-primary" : "text-foreground"}
                   `}
                   style={{
