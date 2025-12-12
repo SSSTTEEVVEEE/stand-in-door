@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,9 @@ import { authSchema } from "@/lib/validation";
 import { secureCredentials } from "@/lib/secureTransmission";
 import { useFraudTelemetry } from "@/hooks/useFraudTelemetry";
 import { TrackingEnforcementModal } from "@/components/TrackingEnforcementModal";
+import { SecureKeyboard } from "@/components/SecureKeyboard";
+import { SecureInput } from "@/components/SecureInput";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -20,6 +23,10 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const isMobile = useIsMobile();
+  
+  // Secure keyboard state
+  const [activeField, setActiveField] = useState<"email" | "password" | null>(null);
   
   // Fraud telemetry
   const {
@@ -31,6 +38,27 @@ const Auth = () => {
     startContinuousMonitoring,
     stopContinuousMonitoring,
   } = useFraudTelemetry();
+  
+  // Secure keyboard handlers
+  const handleKeyPress = useCallback((char: string) => {
+    if (activeField === "email") {
+      setEmail((prev) => prev + char);
+    } else if (activeField === "password") {
+      setPassword((prev) => prev + char);
+    }
+  }, [activeField]);
+  
+  const handleDelete = useCallback(() => {
+    if (activeField === "email") {
+      setEmail((prev) => prev.slice(0, -1));
+    } else if (activeField === "password") {
+      setPassword((prev) => prev.slice(0, -1));
+    }
+  }, [activeField]);
+  
+  const handleKeyboardSubmit = useCallback(() => {
+    setActiveField(null);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -164,7 +192,15 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      onTouchStart={() => {
+        // Close keyboard when tapping outside inputs
+        if (activeField) {
+          setActiveField(null);
+        }
+      }}
+    >
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2">STAND</h1>
@@ -174,29 +210,55 @@ const Auth = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              className="font-mono"
-            />
+            {isMobile ? (
+              <SecureInput
+                id="email"
+                type="email"
+                value={email}
+                onChange={setEmail}
+                onFocus={() => setActiveField("email")}
+                onBlur={() => {}}
+                placeholder="your@email.com"
+                isFocused={activeField === "email"}
+              />
+            ) : (
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+                className="font-mono"
+              />
+            )}
           </div>
 
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              minLength={6}
-              className="font-mono"
-            />
+            {isMobile ? (
+              <SecureInput
+                id="password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                onFocus={() => setActiveField("password")}
+                onBlur={() => {}}
+                placeholder="••••••••"
+                isFocused={activeField === "password"}
+              />
+            ) : (
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+                className="font-mono"
+              />
+            )}
           </div>
 
           <Button 
@@ -226,6 +288,16 @@ const Auth = () => {
         isOpen={trackingBlocked} 
         onRetry={handleTelemetryRetry}
       />
+      
+      {/* Secure keyboard for mobile */}
+      {isMobile && (
+        <SecureKeyboard
+          visible={activeField !== null}
+          onKeyPress={handleKeyPress}
+          onDelete={handleDelete}
+          onSubmit={handleKeyboardSubmit}
+        />
+      )}
     </div>
   );
 };
