@@ -296,6 +296,7 @@ const Auth = () => {
           onKeyPress={handleKeyPress}
           onDelete={handleDelete}
           onSubmit={handleKeyboardSubmit}
+          inputType={activeField || "email"}
         />
       )}
     </div>
