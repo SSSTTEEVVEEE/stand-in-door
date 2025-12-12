@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 
 type KeyboardMode = "lowercase" | "uppercase" | "symbols";
-type InputType = "email" | "password";
+type InputType = "email" | "password" | "text";
 
 interface SecureKeyboardProps {
   onKeyPress: (char: string) => void;
@@ -9,6 +9,7 @@ interface SecureKeyboardProps {
   onSubmit: () => void;
   visible: boolean;
   inputType: InputType;
+  zeroFeedback?: boolean;
 }
 
 const LOWERCASE_ROWS = [
@@ -54,6 +55,7 @@ export const SecureKeyboard = ({
   onSubmit,
   visible,
   inputType,
+  zeroFeedback = false,
 }: SecureKeyboardProps) => {
   const [mode, setMode] = useState<KeyboardMode>("lowercase");
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
@@ -77,8 +79,13 @@ export const SecureKeyboard = ({
     return array[0] / (0xffffffff + 1);
   }, []);
 
-  // Show key highlight (real for email, random for password)
+  // Show key highlight (real for email, random for password, none for zero feedback)
   const showKeyHighlight = useCallback((actualKeyId: string) => {
+    // Zero feedback mode - no visual indication at all
+    if (zeroFeedback) {
+      return;
+    }
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -90,7 +97,7 @@ export const SecureKeyboard = ({
         setHighlightedKey(null);
       }, 100 + getSecureRandom() * 50);
     } else {
-      // For password: show a random key with slight delay
+      // For password and text: show a random key with slight delay
       const delay = 20 + getSecureRandom() * 80;
       
       timeoutRef.current = setTimeout(() => {
@@ -107,7 +114,7 @@ export const SecureKeyboard = ({
         }, 80 + getSecureRandom() * 70);
       }, delay);
     }
-  }, [inputType, getSecureRandom, mode]);
+  }, [inputType, getSecureRandom, mode, zeroFeedback]);
 
   // Handle key press with timing jitter
   const handleKeyTouch = useCallback(

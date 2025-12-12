@@ -6,7 +6,7 @@ interface SecureInputProps {
   onChange: (value: string) => void;
   onFocus: () => void;
   onBlur: () => void;
-  type: "email" | "password";
+  type: "email" | "password" | "text";
   placeholder?: string;
   id?: string;
   className?: string;
@@ -59,7 +59,7 @@ export const SecureInput = ({
       ref={inputRef}
       id={id}
       role="textbox"
-      aria-label={type === "password" ? "Password input" : "Email input"}
+      aria-label={type === "password" ? "Password input" : type === "email" ? "Email input" : "Text input"}
       tabIndex={0}
       onTouchStart={handleTouchStart}
       onClick={handleClick}

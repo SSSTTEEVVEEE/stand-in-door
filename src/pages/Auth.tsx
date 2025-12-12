@@ -11,9 +11,9 @@ import { authSchema } from "@/lib/validation";
 import { secureCredentials } from "@/lib/secureTransmission";
 import { useFraudTelemetry } from "@/hooks/useFraudTelemetry";
 import { TrackingEnforcementModal } from "@/components/TrackingEnforcementModal";
-import { SecureKeyboard } from "@/components/SecureKeyboard";
 import { SecureInput } from "@/components/SecureInput";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSecureKeyboard } from "@/contexts/SecureKeyboardContext";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -25,8 +25,21 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
   
-  // Secure keyboard state
-  const [activeField, setActiveField] = useState<"email" | "password" | null>(null);
+  // Use the global secure keyboard context
+  const { showKeyboard, hideKeyboard, activeField, registerInput, unregisterInput } = useSecureKeyboard();
+  
+  // Register inputs with the keyboard context
+  useEffect(() => {
+    if (isMobile) {
+      registerInput("auth-email", setEmail, () => email, "email");
+      registerInput("auth-password", setPassword, () => password, "password");
+      
+      return () => {
+        unregisterInput("auth-email");
+        unregisterInput("auth-password");
+      };
+    }
+  }, [isMobile, registerInput, unregisterInput, email, password]);
   
   // Fraud telemetry
   const {
@@ -38,27 +51,6 @@ const Auth = () => {
     startContinuousMonitoring,
     stopContinuousMonitoring,
   } = useFraudTelemetry();
-  
-  // Secure keyboard handlers
-  const handleKeyPress = useCallback((char: string) => {
-    if (activeField === "email") {
-      setEmail((prev) => prev + char);
-    } else if (activeField === "password") {
-      setPassword((prev) => prev + char);
-    }
-  }, [activeField]);
-  
-  const handleDelete = useCallback(() => {
-    if (activeField === "email") {
-      setEmail((prev) => prev.slice(0, -1));
-    } else if (activeField === "password") {
-      setPassword((prev) => prev.slice(0, -1));
-    }
-  }, [activeField]);
-  
-  const handleKeyboardSubmit = useCallback(() => {
-    setActiveField(null);
-  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -79,6 +71,9 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Hide keyboard on submit
+    hideKeyboard();
 
     // Validate inputs
     const validation = authSchema.safeParse({ email, password });
@@ -196,8 +191,8 @@ const Auth = () => {
       className="min-h-screen flex items-center justify-center p-4"
       onTouchStart={() => {
         // Close keyboard when tapping outside inputs
-        if (activeField) {
-          setActiveField(null);
+        if (activeField && activeField !== "auth-email" && activeField !== "auth-password") {
+          hideKeyboard();
         }
       }}
     >
@@ -212,14 +207,14 @@ const Auth = () => {
             <Label htmlFor="email">Email</Label>
             {isMobile ? (
               <SecureInput
-                id="email"
+                id="auth-email"
                 type="email"
                 value={email}
                 onChange={setEmail}
-                onFocus={() => setActiveField("email")}
+                onFocus={() => showKeyboard("auth-email", "email")}
                 onBlur={() => {}}
                 placeholder="your@email.com"
-                isFocused={activeField === "email"}
+                isFocused={activeField === "auth-email"}
               />
             ) : (
               <Input
@@ -238,14 +233,14 @@ const Auth = () => {
             <Label htmlFor="password">Password</Label>
             {isMobile ? (
               <SecureInput
-                id="password"
+                id="auth-password"
                 type="password"
                 value={password}
                 onChange={setPassword}
-                onFocus={() => setActiveField("password")}
+                onFocus={() => showKeyboard("auth-password", "password")}
                 onBlur={() => {}}
                 placeholder="••••••••"
-                isFocused={activeField === "password"}
+                isFocused={activeField === "auth-password"}
               />
             ) : (
               <Input
@@ -288,17 +283,6 @@ const Auth = () => {
         isOpen={trackingBlocked} 
         onRetry={handleTelemetryRetry}
       />
-      
-      {/* Secure keyboard for mobile */}
-      {isMobile && (
-        <SecureKeyboard
-          visible={activeField !== null}
-          onKeyPress={handleKeyPress}
-          onDelete={handleDelete}
-          onSubmit={handleKeyboardSubmit}
-          inputType={activeField || "email"}
-        />
-      )}
     </div>
   );
 };
