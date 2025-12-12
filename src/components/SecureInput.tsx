@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, stripWatermarkChars } from "@/lib/utils";
 
 interface SecureInputProps {
   value: string;
@@ -41,8 +41,11 @@ export const SecureInput = ({
     return () => clearInterval(interval);
   }, [isFocused]);
 
-  // Display value - mask for password
-  const displayValue = type === "password" ? "•".repeat(value.length) : value;
+  // Strip watermark characters for display
+  const cleanValue = stripWatermarkChars(value);
+  
+  // Display value - mask for password using clean character count
+  const displayValue = type === "password" ? "•".repeat(cleanValue.length) : cleanValue;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();

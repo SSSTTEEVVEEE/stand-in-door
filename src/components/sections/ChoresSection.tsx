@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEncryption } from "@/contexts/EncryptionContext";
 import { choreSchema } from "@/lib/validation";
+import { stripWatermarkChars } from "@/lib/utils";
 
 interface Chore {
   id?: string;
@@ -286,9 +287,9 @@ const ChoresSection = () => {
         <h2 className="text-2xl font-bold mb-4">TASK CONFIGURATION</h2>
 
         <div className="space-y-4 mb-6">
-          {chores.map((chore, index) => (
+        {chores.map((chore, index) => (
             <div key={index} className="flex items-center gap-4 p-3 bg-muted/50 rounded">
-              <span className="font-bold min-w-[100px]">{chore.name}</span>
+              <span className="font-bold min-w-[100px]">{stripWatermarkChars(chore.name)}</span>
               <span className="text-muted-foreground">Period: {chore.period} days</span>
               <Button variant="destructive" size="sm" onClick={() => removeChore(index)} className="ml-auto">
                 REMOVE

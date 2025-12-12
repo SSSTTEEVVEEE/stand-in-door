@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { calendarEventSchema } from "@/lib/validation";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { RepeatDaysSelector } from "@/components/ui/repeat-days-selector";
+import { stripWatermarkChars } from "@/lib/utils";
 
 interface CalendarEvent {
   id: string;
@@ -538,9 +539,9 @@ const CalendarSection = () => {
                             e.stopPropagation();
                             openEditDialog(event);
                           }}
-                          title={`${event.time}${event.endTime ? `-${event.endTime}` : ''} - ${event.title}${event.repeatDays?.length ? ' (repeats)' : ''}`}
+                          title={`${event.time}${event.endTime ? `-${event.endTime}` : ''} - ${stripWatermarkChars(event.title)}${event.repeatDays?.length ? ' (repeats)' : ''}`}
                         >
-                          {event.time} {event.title}
+                          {event.time} {stripWatermarkChars(event.title)}
                         </div>
                       ))}
                       {dayEvents.length > 2 && (
@@ -631,10 +632,10 @@ const CalendarSection = () => {
                                   e.stopPropagation();
                                   openEditDialog(event);
                                 }}
-                                title={`${event.time} - ${event.title}`}
+                                title={`${event.time} - ${stripWatermarkChars(event.title)}`}
                               >
                                 <div className="font-bold">{event.time}</div>
-                                <div className="truncate">{event.title}</div>
+                                <div className="truncate">{stripWatermarkChars(event.title)}</div>
                               </div>
                             ))}
                           </div>
@@ -697,9 +698,9 @@ const CalendarSection = () => {
                               openEditDialog(event);
                             }}
                           >
-                            <div className="font-bold">{event.time} - {event.title}</div>
+                            <div className="font-bold">{event.time} - {stripWatermarkChars(event.title)}</div>
                             {event.description && (
-                              <div className="text-sm text-muted-foreground mt-1">{event.description}</div>
+                              <div className="text-sm text-muted-foreground mt-1">{stripWatermarkChars(event.description)}</div>
                             )}
                           </div>
                         ))}
