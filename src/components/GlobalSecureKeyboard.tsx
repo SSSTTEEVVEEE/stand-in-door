@@ -23,6 +23,7 @@ export const GlobalSecureKeyboard = () => {
       onSubmit={handleSubmit}
       inputType={inputType}
       zeroFeedback={!isAuthPage}
+      injectWatermark={!isAuthPage}
     />
   );
 };

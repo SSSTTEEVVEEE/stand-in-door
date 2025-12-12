@@ -10,6 +10,7 @@ import { useEncryption } from "@/contexts/EncryptionContext";
 import { Pencil, Check, X, Trash2 } from "lucide-react";
 import { checklistSchema, reminderSchema } from "@/lib/validation";
 import { getNextRepeatDate } from "@/components/ui/repeat-days-selector";
+import { stripWatermarkChars } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -900,7 +901,7 @@ const ChecklistsSection = () => {
                       </div>
                     ) : (
                       <>
-                        <h3 className="text-xl font-bold">{checklist.name}</h3>
+                        <h3 className="text-xl font-bold">{stripWatermarkChars(checklist.name)}</h3>
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
@@ -951,7 +952,7 @@ const ChecklistsSection = () => {
                         ) : (
                           <>
                             <span className={`flex-1 ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
-                              {reminder.text}
+                              {stripWatermarkChars(reminder.text)}
                             </span>
                             <Button
                               size="sm"
@@ -1032,7 +1033,7 @@ const ChecklistsSection = () => {
                   onCheckedChange={() => toggleSimpleReminder(reminder.id)}
                 />
                 <span className={`flex-1 ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
-                  {reminder.text}
+                  {stripWatermarkChars(reminder.text)}
                   {reminder.repeatDays && reminder.repeatDays.length > 0 && (
                     <span className="text-xs text-muted-foreground ml-2">(repeats)</span>
                   )}
