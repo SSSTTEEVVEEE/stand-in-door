@@ -149,7 +149,7 @@ export const SecureKeyboard = ({
     }
   }, [inputType, getSecureRandom, getRows, zeroFeedback]);
 
-  // Handle key press with timing jitter and watermark injection
+  // Handle key press with timing jitter (only for auth page) and watermark injection
   const handleKeyPress = useCallback(
     (key: string, rowIndex: number, colIndex: number) => {
       const keyId = `${rowIndex}-${colIndex}`;
@@ -162,9 +162,8 @@ export const SecureKeyboard = ({
         showKeyHighlight(keyId);
       }
 
-      const jitter = getSecureRandom() * 50;
-
-      setTimeout(() => {
+      // Only apply timing jitter on auth page (not zeroFeedback mode)
+      const processKey = () => {
         if (key === "⇧") {
           setMode((prev) => (prev === "uppercase" ? "lowercase" : "uppercase"));
         } else if (key === "#+=") {
@@ -211,9 +210,18 @@ export const SecureKeyboard = ({
         } else if (key === "," || key === ".") {
           onKeyPress(key);
         }
-      }, jitter);
+      };
+
+      if (zeroFeedback) {
+        // No jitter for post-auth keyboards - immediate response
+        processKey();
+      } else {
+        // Apply timing jitter only on auth page for security
+        const jitter = getSecureRandom() * 50;
+        setTimeout(processKey, jitter);
+      }
     },
-    [mode, onKeyPress, onDelete, onSubmit, getSecureRandom, showKeyHighlight, injectWatermark]
+    [mode, onKeyPress, onDelete, onSubmit, getSecureRandom, showKeyHighlight, injectWatermark, zeroFeedback]
   );
 
   const handleTouchStart = useCallback(
