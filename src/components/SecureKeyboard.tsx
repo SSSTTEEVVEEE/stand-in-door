@@ -373,8 +373,8 @@ export const SecureKeyboard = ({
                     ${isIOS ? "text-[17px]" : "text-base"}
                     font-normal
                     transition-none
-                    ${getKeyStyle(isSpecial, isSpace, isHighlighted)}
-                    active:opacity-70
+                    ${getKeyStyle(isSpecial, isSpace, zeroFeedback ? false : isHighlighted)}
+                    ${zeroFeedback ? "" : "active:opacity-70"}
                   `}
                   style={{
                     WebkitTapHighlightColor: "transparent",
