@@ -29,13 +29,14 @@ export const authSchema = z.object({
 });
 
 // Chore validation schema with strict character validation
+// Note: \u0800-\u083F allows Samaritan watermark characters (steganographic security)
 export const choreSchema = z.object({
   name: sanitizedString
     .pipe(
       z.string()
         .min(1, { message: "Chore name cannot be empty" })
         .max(200, { message: "Chore name must be less than 200 characters" })
-        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&]+$/, {
+        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\u0800-\u083F]+$/, {
           message: "Chore name contains invalid characters"
         })
     ),
@@ -53,7 +54,7 @@ export const checklistSchema = z.object({
       z.string()
         .min(1, { message: "Checklist name cannot be empty" })
         .max(200, { message: "Checklist name must be less than 200 characters" })
-        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&]+$/, {
+        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\u0800-\u083F]+$/, {
           message: "Checklist name contains invalid characters"
         })
     ),
@@ -66,7 +67,7 @@ export const reminderSchema = z.object({
       z.string()
         .min(1, { message: "Reminder text cannot be empty" })
         .max(500, { message: "Reminder text must be less than 500 characters" })
-        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\n]+$/, {
+        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\n\u0800-\u083F]+$/, {
           message: "Reminder text contains invalid characters"
         })
     ),
@@ -79,14 +80,14 @@ export const calendarEventSchema = z.object({
       z.string()
         .min(1, { message: "Event title cannot be empty" })
         .max(200, { message: "Event title must be less than 200 characters" })
-        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&]+$/, {
+        .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\u0800-\u083F]+$/, {
           message: "Event title contains invalid characters"
         })
     ),
   description: z
     .string()
     .max(1000, { message: "Description must be less than 1000 characters" })
-    .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\n]*$/, {
+    .regex(/^[a-zA-Z0-9\s\-_.,!?()'"/&\n\u0800-\u083F]*$/, {
       message: "Description contains invalid characters"
     })
     .optional()
