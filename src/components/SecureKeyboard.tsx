@@ -374,7 +374,7 @@ export const SecureKeyboard = ({
                     font-normal
                     transition-none
                     ${getKeyStyle(isSpecial, isSpace, zeroFeedback ? false : isHighlighted)}
-                    ${zeroFeedback ? "" : "active:opacity-70"}
+                    ${!zeroFeedback && inputType === "email" ? "active:opacity-70" : ""}
                   `}
                   style={{
                     WebkitTapHighlightColor: "transparent",
