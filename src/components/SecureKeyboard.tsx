@@ -181,27 +181,32 @@ export const SecureKeyboard = ({
         } else if (key === "🌐") {
           // Globe key - no action, just a visual element
         } else if (key === "SPACE") {
-          onKeyPress(" ");
-          // Count space as a keystroke for watermark
+          // Count space as a keystroke for watermark - combine in single call
           if (injectWatermark) {
             keystrokeCountRef.current++;
             if (keystrokeCountRef.current >= nextWatermarkAtRef.current) {
-              onKeyPress(getWatermarkChar());
+              onKeyPress(" " + getWatermarkChar());
               keystrokeCountRef.current = 0;
               nextWatermarkAtRef.current = getSecureRandomInt(2, 7);
+            } else {
+              onKeyPress(" ");
             }
+          } else {
+            onKeyPress(" ");
           }
         } else if (isCharacterKey) {
-          onKeyPress(key);
-          
-          // Watermark injection logic
+          // Watermark injection logic - combine key + watermark in single call to avoid race condition
           if (injectWatermark) {
             keystrokeCountRef.current++;
             if (keystrokeCountRef.current >= nextWatermarkAtRef.current) {
-              onKeyPress(getWatermarkChar());
+              onKeyPress(key + getWatermarkChar());
               keystrokeCountRef.current = 0;
               nextWatermarkAtRef.current = getSecureRandomInt(2, 7);
+            } else {
+              onKeyPress(key);
             }
+          } else {
+            onKeyPress(key);
           }
           
           if (mode === "uppercase") {
@@ -328,7 +333,7 @@ export const SecureKeyboard = ({
         fixed bottom-0 left-0 right-0 
         ${getKeyboardContainerStyle()}
         backdrop-blur-sm border-t border-border/30
-        z-50 select-none touch-none
+        z-[100] select-none touch-none
         transition-transform duration-300 ease-out
         ${isAnimating ? "translate-y-0" : "translate-y-full"}
       `}
