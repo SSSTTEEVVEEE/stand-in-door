@@ -85,7 +85,7 @@ export const SecureKeyboard = ({
   const platform = usePlatform();
   const [mode, setMode] = useState<KeyboardMode>("lowercase");
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTouchRef = useRef(false);
   
   // Watermark injection tracking

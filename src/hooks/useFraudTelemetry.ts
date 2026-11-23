@@ -80,7 +80,7 @@ export function useFraudTelemetry() {
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionComplete, setCollectionComplete] = useState(false);
   const [trackingBlocked, setTrackingBlocked] = useState(false);
-  const continuousMonitoringRef = useRef<NodeJS.Timeout | null>(null);
+  const continuousMonitoringRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Get or create persistent tracking ID
   function getOrCreateTrackingId(): string {
